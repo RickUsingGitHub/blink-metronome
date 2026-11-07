@@ -1,6 +1,6 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.1.1';
 export const KOFI_URL = 'https://ko-fi.com/TABifier';
 const KEY = 'blink.v1';
 

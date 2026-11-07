@@ -1,6 +1,6 @@
 /* Offline shell. Bump CACHE when any file below changes. */
 
-const CACHE = 'blink-v1.1.0';
+const CACHE = 'blink-v1.1.1';
 const FILES = [
   './',
   './index.html',
@@ -39,30 +39,41 @@ self.addEventListener('activate', ev => {
   );
 });
 
+/* The page and its code go network-first, so a new version is live the moment
+   it is published — cache-first here served a stale shell for one whole load,
+   and an old index.html against new modules is worse than a slow one. Icons
+   and other assets stay cache-first; both fall back to the cache offline. */
+const CODE = /\.(?:js|css|webmanifest)$/;
+
+function put(req, res){
+  if(res && res.ok && res.type === 'basic'){
+    const copy = res.clone();
+    caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+  }
+  return res;
+}
+
 self.addEventListener('fetch', ev => {
   const req = ev.request;
   if(req.method !== 'GET') return;
   const url = new URL(req.url);
-  if(url.origin !== self.location.origin) return;   // let the font CDN fall back to the network
+  if(url.origin !== self.location.origin) return;   // let the font CDN go straight to the network
+
+  const fresh = req.mode === 'navigate' || CODE.test(url.pathname);
+
+  if(fresh){
+    ev.respondWith(
+      fetch(req)
+        .then(res => put(req, res))
+        .catch(() => caches.match(req, { ignoreSearch:true })
+          .then(hit => hit || caches.match('./index.html')))
+    );
+    return;
+  }
 
   ev.respondWith(
-    caches.match(req, { ignoreSearch:true }).then(hit => {
-      if(hit){
-        // refresh in the background so the next load is current
-        fetch(req).then(res => {
-          if(res && res.ok) caches.open(CACHE).then(c => c.put(req, res.clone()));
-        }).catch(() => {});
-        return hit;
-      }
-      return fetch(req)
-        .then(res => {
-          if(res && res.ok && res.type === 'basic'){
-            const copy = res.clone();
-            caches.open(CACHE).then(c => c.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => caches.match('./index.html'));
-    })
+    caches.match(req, { ignoreSearch:true }).then(hit =>
+      hit || fetch(req).then(res => put(req, res)).catch(() => hit)
+    )
   );
 });
