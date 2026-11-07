@@ -74,7 +74,7 @@ when the main thread is busy — a plain `setInterval` metronome drifts audibly.
 ## Support
 
 Blink is free. If it earns its place on your music stand, you can
-[buy us a coffee](https://ko-fi.com/TABifier).
+[buy me a coffee](https://ko-fi.com/rickapps).
 
 ## Privacy
 
