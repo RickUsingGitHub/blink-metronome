@@ -1,7 +1,6 @@
 # Blink Metronome
 
-A metronome you can silence while it keeps flashing the beat — the thing Soundbrenner's app
-only does properly with the wearable. Any beat can be set to **flash without clicking**, or the
+A metronome you can silence while it keeps flashing the beat. Any beat can be set to **flash without clicking**, or the
 whole bar can be muted in one tap while the screen keeps the time.
 
 It runs in the phone browser, installs to the home screen, and works offline.
