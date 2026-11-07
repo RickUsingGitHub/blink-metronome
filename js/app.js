@@ -177,32 +177,31 @@ function wireUpdateBar(){
 }
 
 if('serviceWorker' in navigator){
-  // true on a repeat visit; false the first time, when claiming is not an update
-  const hadController = !!navigator.serviceWorker.controller;
+  const TAG = 'blink-v' + VERSION;          // what this page is actually running
 
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if(hadController) offerUpdate();
+  const ask = () => {
+    const c = navigator.serviceWorker.controller;
+    if(c) c.postMessage({ type:'version?' });
+  };
+
+  navigator.serviceWorker.addEventListener('message', ev => {
+    const d = ev.data;
+    if(d && d.type === 'sw-version' && d.version !== TAG) offerUpdate();
   });
+
+  navigator.serviceWorker.addEventListener('controllerchange', ask);
 
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').then(reg => {
       const el = $('swState');
       if(el) el.textContent = 'Ready to run offline.';
-
-      const watch = w => {
-        if(!w) return;
-        w.addEventListener('statechange', () => {
-          if((w.state === 'installed' || w.state === 'activated') && hadController) offerUpdate();
-        });
-      };
-      if(reg.waiting && hadController) offerUpdate();
-      watch(reg.installing);
-      reg.addEventListener('updatefound', () => watch(reg.installing));
+      ask();
 
       // look for a new version whenever the app comes back to the foreground
       document.addEventListener('visibilitychange', () => {
         if(document.visibilityState === 'visible'){
           try{ reg.update(); }catch(err){}
+          ask();
         }
       });
     }, () => {

@@ -1,6 +1,6 @@
 /* Offline shell. Bump CACHE when any file below changes. */
 
-const CACHE = 'blink-v1.2.1';
+const CACHE = 'blink-v1.2.2';
 const FILES = [
   './',
   './index.html',
@@ -31,11 +31,27 @@ self.addEventListener('install', ev => {
   );
 });
 
+/* Tell the open pages which version is now in charge. They compare it with the
+   code they are actually running, so the reload prompt only appears when the
+   page really is behind — taking over is not by itself news. */
+function announce(){
+  return self.clients.matchAll({ includeUncontrolled:true })
+    .then(cs => cs.forEach(c => c.postMessage({ type:'sw-version', version: CACHE })))
+    .catch(() => {});
+}
+
+self.addEventListener('message', ev => {
+  if(ev.data && ev.data.type === 'version?' && ev.source){
+    ev.source.postMessage({ type:'sw-version', version: CACHE });
+  }
+});
+
 self.addEventListener('activate', ev => {
   ev.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
+      .then(announce)
   );
 });
 
