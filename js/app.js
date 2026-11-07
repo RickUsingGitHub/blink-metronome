@@ -167,41 +167,64 @@ window.addEventListener('beforeinstallprompt', ev => {
    A new worker takes over as soon as it installs, but this page is still running
    the old code until it reloads. Say so and let the user pick the moment — an
    automatic reload would cut off a bar mid-practice. */
-function offerUpdate(){
+let pendingWorker = null;        // a new version, installed and waiting its turn
+
+function offerUpdate(worker){
+  pendingWorker = worker || pendingWorker;
   const bar = $('updateBar');
   if(bar) bar.hidden = false;
 }
 function wireUpdateBar(){
-  $('updateBtn').addEventListener('click', () => { location.reload(); });
+  $('updateBtn').addEventListener('click', () => {
+    $('updateBtn').textContent = 'Reloading…';
+    if(pendingWorker){
+      // let it take over; the controllerchange handler reloads once it has
+      pendingWorker.postMessage({ type:'skipWaiting' });
+      setTimeout(() => location.reload(), 1500);   // in case the handover is silent
+    }else{
+      location.reload();
+    }
+  });
   $('updateLater').addEventListener('click', () => { $('updateBar').hidden = true; });
 }
 
 if('serviceWorker' in navigator){
   const TAG = 'blink-v' + VERSION;          // what this page is actually running
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
 
-  const ask = () => {
-    const c = navigator.serviceWorker.controller;
-    if(c) c.postMessage({ type:'version?' });
-  };
-
-  navigator.serviceWorker.addEventListener('message', ev => {
-    const d = ev.data;
-    if(d && d.type === 'sw-version' && d.version !== TAG) offerUpdate();
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // only an update we asked for gets here; the first-ever claim is not one
+    if(!hadController || reloading) return;
+    reloading = true;
+    location.reload();
   });
 
-  navigator.serviceWorker.addEventListener('controllerchange', ask);
+  // older workers announce their version; useful when this page is the stale one
+  navigator.serviceWorker.addEventListener('message', ev => {
+    const d = ev.data;
+    if(d && d.type === 'sw-version' && d.version !== TAG) offerUpdate(null);
+  });
 
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').then(reg => {
       const el = $('swState');
       if(el) el.textContent = 'Ready to run offline.';
-      ask();
+
+      // a worker already waiting means a newer version is installed and ready
+      if(reg.waiting && hadController) offerUpdate(reg.waiting);
+      reg.addEventListener('updatefound', () => {
+        const w = reg.installing;
+        if(!w) return;
+        w.addEventListener('statechange', () => {
+          if(w.state === 'installed' && hadController) offerUpdate(reg.waiting || w);
+        });
+      });
 
       // look for a new version whenever the app comes back to the foreground
       document.addEventListener('visibilitychange', () => {
         if(document.visibilityState === 'visible'){
           try{ reg.update(); }catch(err){}
-          ask();
         }
       });
     }, () => {

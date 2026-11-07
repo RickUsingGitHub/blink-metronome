@@ -1,6 +1,6 @@
 /* Offline shell. Bump CACHE when any file below changes. */
 
-const CACHE = 'blink-v1.2.2';
+const CACHE = 'blink-v1.2.3';
 const FILES = [
   './',
   './index.html',
@@ -23,11 +23,13 @@ const FILES = [
   './icons/apple-touch-icon.png'
 ];
 
+/* No skipWaiting here on purpose. A new worker installs and then waits, which
+   is the signal the page uses to offer a reload; it takes over only when the
+   user accepts, so nothing changes underneath a running bar. */
 self.addEventListener('install', ev => {
   ev.waitUntil(
     caches.open(CACHE)
       .then(c => Promise.allSettled(FILES.map(f => c.add(new Request(f, { cache:'reload' })))))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -41,7 +43,10 @@ function announce(){
 }
 
 self.addEventListener('message', ev => {
-  if(ev.data && ev.data.type === 'version?' && ev.source){
+  const d = ev.data;
+  if(!d) return;
+  if(d.type === 'skipWaiting') self.skipWaiting();            // the user pressed Reload
+  if(d.type === 'version?' && ev.source){
     ev.source.postMessage({ type:'sw-version', version: CACHE });
   }
 });

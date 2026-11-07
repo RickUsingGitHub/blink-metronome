@@ -77,10 +77,11 @@ The page, its code and the manifest are fetched network-first and revalidated pa
 browser's own HTTP cache — GitHub Pages sends `max-age=600`, which will otherwise hand
 back a module up to ten minutes old and pair a new `index.html` with stale code. So a
 published change is live on the next load; icons and other assets stay cache-first, and
-everything falls back to the cache offline. When a new worker takes over, it tells the open pages its version; a page compares that
-with the code it is running and shows a reload bar only if it is genuinely behind. The
-bar never reloads on its own — a reload mid-bar would stop the metronome. The app also
-re-checks for a new version each time it comes back to the foreground.
+everything falls back to the cache offline. A new worker installs and then waits rather than taking over, and that waiting worker is
+what the page treats as "a new version is ready": it shows a bar with Reload and Later.
+Reload tells the waiting worker to take over and reloads once it has; nothing happens
+until then, because a reload mid-bar would stop the metronome. The app re-checks for a
+new version each time it comes back to the foreground.
 
 ## Support
 
