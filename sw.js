@@ -1,6 +1,6 @@
 /* Offline shell. Bump CACHE when any file below changes. */
 
-const CACHE = 'blink-v1.2.0';
+const CACHE = 'blink-v1.2.1';
 const FILES = [
   './',
   './index.html',
@@ -62,8 +62,11 @@ self.addEventListener('fetch', ev => {
   const fresh = req.mode === 'navigate' || CODE.test(url.pathname);
 
   if(fresh){
+    // Revalidate past the browser's own HTTP cache: GitHub Pages sends
+    // max-age=600, which otherwise hands back a module up to ten minutes old
+    // and can pair a new page with stale code.
     ev.respondWith(
-      fetch(req)
+      fetch(req.url, { cache:'no-cache', credentials:'same-origin' })
         .then(res => put(req, res))
         .catch(() => caches.match(req, { ignoreSearch:true })
           .then(hit => hit || caches.match('./index.html')))

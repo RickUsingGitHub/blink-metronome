@@ -73,10 +73,11 @@ when the main thread is busy — a plain `setInterval` metronome drifts audibly.
 
 ## Updates
 
-The page, its code and the manifest are fetched network-first, so a published change is
-live on the next load and an installed copy can never pair a new `index.html` with old
-modules; icons and other assets stay cache-first, and everything falls back to the cache
-offline. When a new version takes over while the app is open, a bar appears offering a
+The page, its code and the manifest are fetched network-first and revalidated past the
+browser's own HTTP cache — GitHub Pages sends `max-age=600`, which will otherwise hand
+back a module up to ten minutes old and pair a new `index.html` with stale code. So a
+published change is live on the next load; icons and other assets stay cache-first, and
+everything falls back to the cache offline. When a new version takes over while the app is open, a bar appears offering a
 reload rather than reloading on its own — a reload mid-bar would stop the metronome.
 The app also re-checks for a new version each time it comes back to the foreground.
 
