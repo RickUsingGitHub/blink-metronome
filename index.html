@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Blink Metronome</title>
+<meta name="description" content="Metronome, tuner and decibel meter with a silent flash mode — every beat can flash without making a sound.">
+<meta name="theme-color" content="#0a0c10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Blink">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- full-screen beat flash -->
+<div id="flash" aria-hidden="true"></div>
+
+<div class="shell">
+
+  <!-- ================= METRONOME ================= -->
+  <section class="view" id="view-metronome" data-view="metronome">
+    <header class="topbar">
+      <div class="brand">Blink<span>.</span></div>
+      <div class="grow"></div>
+      <div class="songname" id="songName" hidden></div>
+      <button class="chip-btn" id="stageBtn" type="button" title="Hide everything but the flash">Stage</button>
+      <button class="chip-btn" id="fsBtn" type="button" title="Full screen">⤢</button>
+    </header>
+
+    <!-- the headline control -->
+    <div class="silentcard">
+      <div class="silentcard-txt">
+        <b id="soundTitle">Clicks on</b>
+        <small id="soundSub">Beats flash as well. Switch off for a silent count.</small>
+      </div>
+      <button class="switch" id="soundSw" role="switch" aria-checked="true" aria-label="Clicks on"></button>
+    </div>
+
+    <!-- dial -->
+    <div class="stage" id="stageArea">
+      <div class="dial" id="dial" role="slider" aria-label="Tempo" aria-valuemin="20" aria-valuemax="400" aria-valuenow="120" tabindex="0">
+        <div class="dial-glow" id="dialGlow"></div>
+        <svg class="dial-ticks" viewBox="0 0 200 200" aria-hidden="true"><g id="dialTicks"></g></svg>
+        <div class="dial-face">
+          <div class="bpm" id="bpmNum">120</div>
+          <div class="bpm-unit">BPM</div>
+          <div class="tempomark" id="tempoMark">Allegro</div>
+        </div>
+      </div>
+      <div class="readout">
+        <span id="roBeat">1 / 4</span>
+        <span class="sep">·</span>
+        <span id="roBar">bar 1</span>
+        <span class="sep">·</span>
+        <span id="roTime">0:00</span>
+        <span id="roGap" class="gap-badge" hidden>muted</span>
+      </div>
+    </div>
+
+    <!-- tempo row -->
+    <div class="panel">
+      <div class="row">
+        <button class="step" id="bpmMinus" type="button" aria-label="Slower">−</button>
+        <input type="range" id="bpmRange" min="20" max="400" step="1" value="120" aria-label="Tempo">
+        <button class="step" id="bpmPlus" type="button" aria-label="Faster">+</button>
+        <button class="tapbtn" id="tapBtn" type="button">Tap</button>
+      </div>
+      <div class="row wrap">
+        <span class="lbl">Signature</span>
+        <div class="sigbox">
+          <button class="step sm" id="numMinus" type="button" aria-label="Fewer beats">−</button>
+          <span class="sigval" id="numVal">4</span>
+          <button class="step sm" id="numPlus" type="button" aria-label="More beats">+</button>
+        </div>
+        <div class="seg" id="denSeg" role="group" aria-label="Beat unit">
+          <button type="button" data-den="1">1</button>
+          <button type="button" data-den="2">2</button>
+          <button type="button" data-den="4" aria-pressed="true">4</button>
+          <button type="button" data-den="8">8</button>
+          <button type="button" data-den="16">16</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="lbl">Split</span>
+        <div class="chiprow" id="subRow" role="group" aria-label="Subdivision"></div>
+      </div>
+    </div>
+
+    <!-- beat pattern -->
+    <div class="panel">
+      <div class="panel-head">
+        <span class="lbl">Beats</span>
+        <div class="grow"></div>
+        <button class="mini" id="patAllFlash" type="button">All flash</button>
+        <button class="mini" id="patReset" type="button">Reset</button>
+      </div>
+      <div class="beatgrid" id="beatGrid"></div>
+      <p class="hint">Tap a beat to cycle <b class="c-accent">Accent</b> → <b class="c-beat">Click</b> → <b class="c-mute">Flash</b> (no sound) → <b class="c-off">Rest</b>.</p>
+    </div>
+
+    <!-- sound -->
+    <details class="panel acc" id="accSound">
+      <summary><span class="lbl">Sound</span><span class="sum-val" id="sumSound">Woodblock · 85%</span></summary>
+      <div class="acc-body">
+        <div class="chiprow" id="soundRow" role="group" aria-label="Click sound"></div>
+        <div class="row">
+          <span class="lbl">Volume</span>
+          <input type="range" id="volRange" min="0" max="100" step="1" value="85" aria-label="Volume">
+          <span class="val sm" id="volVal">85</span>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="vibChk"> <span>Vibrate on beats</span></label>
+          <span class="note" id="vibNote"></span>
+        </div>
+      </div>
+    </details>
+
+    <!-- flash -->
+    <details class="panel acc" id="accFlash" open>
+      <summary><span class="lbl">Flash</span><span class="sum-val" id="sumFlash">Whole screen · 85%</span></summary>
+      <div class="acc-body">
+        <div class="row">
+          <span class="lbl">Where</span>
+          <div class="seg" id="targetSeg" role="group" aria-label="Flash target">
+            <button type="button" data-target="screen" aria-pressed="true">Whole screen</button>
+            <button type="button" data-target="dial">Dial only</button>
+            <button type="button" data-target="off">Off</button>
+          </div>
+        </div>
+        <div class="row">
+          <span class="lbl">Bright</span>
+          <input type="range" id="brightRange" min="5" max="100" step="5" value="85" aria-label="Flash brightness">
+          <span class="val sm" id="brightVal">85</span>
+        </div>
+        <div class="row">
+          <span class="lbl">Hold</span>
+          <input type="range" id="holdRange" min="10" max="60" step="5" value="30" aria-label="Flash length">
+          <span class="val sm" id="holdVal">30%</span>
+        </div>
+        <div class="row wrap">
+          <span class="lbl">Colours</span>
+          <label class="swatch">Accent <input type="color" id="colAccent" value="#ffc83d"></label>
+          <label class="swatch">Beat <input type="color" id="colBeat" value="#5fd0ff"></label>
+          <label class="check"><input type="checkbox" id="subFlashChk" checked> <span>Flash splits</span></label>
+        </div>
+      </div>
+    </details>
+
+    <!-- practice -->
+    <details class="panel acc" id="accPractice">
+      <summary><span class="lbl">Practice</span><span class="sum-val" id="sumPractice">Off</span></summary>
+      <div class="acc-body">
+        <div class="row">
+          <span class="lbl">Count-in</span>
+          <div class="seg" id="countInSeg" role="group" aria-label="Count-in bars">
+            <button type="button" data-ci="0" aria-pressed="true">None</button>
+            <button type="button" data-ci="1">1 bar</button>
+            <button type="button" data-ci="2">2 bars</button>
+          </div>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="gapChk"> <span>Gap trainer</span></label>
+        </div>
+        <div class="row">
+          <span class="lbl">Play</span>
+          <button class="step sm" id="gapPlayMinus" type="button" aria-label="Fewer played bars">−</button>
+          <span class="sigval" id="gapPlayVal">2</span>
+          <button class="step sm" id="gapPlayPlus" type="button" aria-label="More played bars">+</button>
+          <span class="lbl">Mute</span>
+          <button class="step sm" id="gapMuteMinus" type="button" aria-label="Fewer muted bars">−</button>
+          <span class="sigval" id="gapMuteVal">2</span>
+          <button class="step sm" id="gapMutePlus" type="button" aria-label="More muted bars">+</button>
+        </div>
+        <p class="hint">In muted bars the clicks drop out. Flashes keep going unless you switch them off too.</p>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="gapFlashChk"> <span>Mute the flash as well</span></label>
+        </div>
+        <div class="row">
+          <span class="lbl">Ramp</span>
+          <label class="check"><input type="checkbox" id="rampChk"> <span>Speed up over time</span></label>
+        </div>
+        <div class="row">
+          <span class="lbl">By</span>
+          <button class="step sm" id="rampByMinus" type="button" aria-label="Smaller step">−</button>
+          <span class="sigval" id="rampByVal">2</span>
+          <button class="step sm" id="rampByPlus" type="button" aria-label="Bigger step">+</button>
+          <span class="lbl">every</span>
+          <button class="step sm" id="rampEveryMinus" type="button" aria-label="Fewer bars">−</button>
+          <span class="sigval" id="rampEveryVal">4</span>
+          <button class="step sm" id="rampEveryPlus" type="button" aria-label="More bars">+</button>
+          <span class="lbl">bars, to</span>
+          <span class="sigval" id="rampToVal">160</span>
+        </div>
+        <div class="row">
+          <input type="range" id="rampToRange" min="20" max="400" step="1" value="160" aria-label="Ramp target tempo">
+        </div>
+      </div>
+    </details>
+
+    <div class="session">
+      <span>Practised today</span><b id="statToday">0:00</b>
+      <span class="sep">·</span>
+      <span>all time</span><b id="statTotal">0:00</b>
+    </div>
+  </section>
+
+  <!-- ================= SETLIST ================= -->
+  <section class="view" id="view-setlist" data-view="setlist" hidden>
+    <header class="topbar">
+      <div class="brand">Setlists</div>
+      <div class="grow"></div>
+      <button class="chip-btn" id="slImport" type="button">Import</button>
+      <button class="chip-btn" id="slExport" type="button">Export</button>
+    </header>
+
+    <div class="panel">
+      <div class="row">
+        <span class="lbl">List</span>
+        <select id="slSelect" class="select" aria-label="Setlist"></select>
+        <button class="mini" id="slNew" type="button">New</button>
+        <button class="mini" id="slRename" type="button">Rename</button>
+        <button class="mini danger" id="slDelete" type="button">Delete</button>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="slAuto"> <span>Auto-advance after</span></label>
+        <button class="step sm" id="slBarsMinus" type="button" aria-label="Fewer bars">−</button>
+        <span class="sigval" id="slBarsVal">8</span>
+        <button class="step sm" id="slBarsPlus" type="button" aria-label="More bars">+</button>
+        <span class="lbl">bars</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="lbl">Songs</span>
+        <div class="grow"></div>
+        <button class="mini" id="songAdd" type="button">+ Add current</button>
+      </div>
+      <ul class="songs" id="songList"></ul>
+      <p class="hint" id="songEmpty">No songs yet. Set the metronome how you want it, then add it here.</p>
+    </div>
+
+    <div class="panel" id="songEditPanel" hidden>
+      <div class="panel-head"><span class="lbl">Edit song</span><div class="grow"></div>
+        <button class="mini" id="songEditClose" type="button">Close</button></div>
+      <div class="acc-body">
+        <div class="row"><span class="lbl">Name</span><input class="text" id="seName" type="text" placeholder="Song name"></div>
+        <div class="row"><span class="lbl">Tempo</span><input class="text num" id="seBpm" type="number" min="20" max="400"><span class="lbl">BPM</span></div>
+        <div class="row"><span class="lbl">Signature</span>
+          <input class="text num" id="seNum" type="number" min="1" max="32">
+          <span class="lbl">/</span>
+          <input class="text num" id="seDen" type="number" min="1" max="16">
+        </div>
+        <div class="row"><span class="lbl">Notes</span><input class="text" id="seNotes" type="text" placeholder="Capo 2, watch the bridge…"></div>
+        <div class="row"><button class="mini" id="seSave" type="button">Save</button>
+          <button class="mini" id="seGrab" type="button">Take current settings</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TUNER ================= -->
+  <section class="view" id="view-tuner" data-view="tuner" hidden>
+    <header class="topbar">
+      <div class="brand">Tuner</div>
+      <div class="grow"></div>
+      <button class="chip-btn" id="tunerBtn" type="button">Start mic</button>
+    </header>
+
+    <div class="tuner">
+      <div class="tuner-note"><span id="tNote">—</span><sub id="tOct"></sub></div>
+      <div class="tuner-cents" id="tCents">listening for a note</div>
+      <div class="needle">
+        <div class="needle-scale" id="needleScale"></div>
+        <div class="needle-pin" id="needlePin"></div>
+        <div class="needle-zero"></div>
+      </div>
+      <div class="tuner-freq"><span id="tFreq">—</span> Hz</div>
+      <div class="tuner-strings" id="tStrings"></div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <span class="lbl">A4</span>
+        <input type="range" id="a4Range" min="415" max="465" step="1" value="440" aria-label="A4 reference">
+        <span class="val sm" id="a4Val">440</span>
+        <button class="mini" id="a4Reset" type="button">440</button>
+      </div>
+      <div class="row">
+        <span class="lbl">Preset</span>
+        <select id="tunePreset" class="select" aria-label="Instrument tuning"></select>
+      </div>
+      <p class="hint" id="tunerNote">The mic is only used while the tuner is running, and nothing leaves your phone.</p>
+    </div>
+  </section>
+
+  <!-- ================= LEVELS ================= -->
+  <section class="view" id="view-levels" data-view="levels" hidden>
+    <header class="topbar">
+      <div class="brand">Sound level</div>
+      <div class="grow"></div>
+      <button class="chip-btn" id="levelsBtn" type="button">Start mic</button>
+    </header>
+
+    <div class="meter">
+      <div class="meter-big"><span id="lvNow">—</span><small>dB</small></div>
+      <div class="meter-bar"><div class="meter-fill" id="lvFill"></div><div class="meter-peak" id="lvPeak"></div></div>
+      <div class="meter-stats">
+        <div><span>min</span><b id="lvMin">—</b></div>
+        <div><span>avg</span><b id="lvAvg">—</b></div>
+        <div><span>max</span><b id="lvMax">—</b></div>
+      </div>
+      <canvas id="lvGraph" class="meter-graph" width="600" height="160" aria-label="Level over time"></canvas>
+      <div class="row">
+        <button class="mini" id="lvReset" type="button">Reset</button>
+        <span class="lbl">Calibrate</span>
+        <input type="range" id="lvCal" min="-20" max="40" step="1" value="0" aria-label="Calibration offset">
+        <span class="val sm" id="lvCalVal">0</span>
+      </div>
+      <p class="hint">Phone mics are not measurement instruments, so treat this as a guide. Use the calibration slider to line it up with a real meter.</p>
+    </div>
+  </section>
+
+  <!-- ================= SETTINGS ================= -->
+  <section class="view" id="view-settings" data-view="settings" hidden>
+    <header class="topbar"><div class="brand">Settings</div></header>
+
+    <div class="panel">
+      <div class="row">
+        <span class="lbl">Theme</span>
+        <div class="seg" id="themeSeg" role="group" aria-label="Theme">
+          <button type="button" data-theme="dark" aria-pressed="true">Dark</button>
+          <button type="button" data-theme="black">Black</button>
+          <button type="button" data-theme="light">Light</button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="wakeChk" checked> <span>Keep the screen awake while playing</span></label>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="bpmUnitChk"> <span>Tempo always counts quarter notes</span></label>
+      </div>
+      <p class="hint">Off, the tempo counts the beat unit in the time signature, so 6/8 at 120 clicks eighth notes.</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="lbl">Install</span></div>
+      <p class="hint" id="installHint">Add Blink to your home screen and it runs full screen and offline. On iPhone: Share → Add to Home Screen. On Android: the menu → Install app.</p>
+      <div class="row"><button class="mini" id="installBtn" type="button" hidden>Install</button>
+        <span class="note" id="swState"></span></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="lbl">Reset</span></div>
+      <div class="row"><button class="mini danger" id="wipeBtn" type="button">Clear saved settings and setlists</button></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="lbl">Shortcuts</span></div>
+      <p class="hint">Space starts and stops. ↑ ↓ change tempo by one, ⇧↑ ⇧↓ by ten. T taps. 1–9 set the beats in a bar. S toggles sound.</p>
+    </div>
+
+    <p class="foot">Blink Metronome · <span id="verTag"></span></p>
+  </section>
+
+</div>
+
+<!-- transport + tabs -->
+<div class="dock">
+  <button class="play" id="playBtn" type="button" data-on="false">Start</button>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="metronome" aria-selected="true">Metronome</button>
+    <button role="tab" data-tab="setlist" aria-selected="false">Setlist</button>
+    <button role="tab" data-tab="tuner" aria-selected="false">Tuner</button>
+    <button role="tab" data-tab="levels" aria-selected="false">Level</button>
+    <button role="tab" data-tab="settings" aria-selected="false">More</button>
+  </nav>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
