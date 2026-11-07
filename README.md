@@ -13,8 +13,24 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 **Metronome**
 - 20–400 BPM: rotary dial, slider, ± buttons, tap tempo
 - Time signatures from 1 to 32 beats, over 1 / 2 / 4 / 8 / 16
-- Subdivisions: eighths, triplets, sixteenths, dotted, swing, off-beat sixteenths, 5, 6, 7
-- Per-beat editor — each beat cycles **Accent → Click → Flash (silent) → Rest**
+- Three sounding tones per beat — each beat cycles
+  **High → Mid → Low → Flash (silent) → Rest**
+- Per-beat volume, 0–150%, so one beat can sit back or push forward on its own
+- 16 split patterns, drawn as their own rhythm rather than labelled with a number —
+  including the ones with a written rest inside the split:
+
+  | | |
+  |---|---|
+  | Quarter | one note on the beat |
+  | Two quavers, triplet, four semiquavers | the plain even splits |
+  | **Swing** | quaver, rest, quaver |
+  | Triplet — first two / rest then two | the other two triplet feels |
+  | Quaver + two semiquavers, two semiquavers + quaver | |
+  | Semiquaver, quaver, semiquaver | |
+  | Dotted quaver + semiquaver, semiquaver + dotted quaver | |
+  | Rest, three semiquavers | |
+  | Quintuplets, sextuplets, septuplets | |
+
 - 11 synthesised sounds: woodblock, click, beep, clave, cowbell, hi-hat, rimshot, kick,
   marimba, glass, tick
 - Vibration on the beat where the browser supports it (Android does, iOS does not)
@@ -34,7 +50,8 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 - Practice time tracked for today and all time
 
 **Setlists**
-- Several lists, each with songs holding tempo, signature, subdivision, sound, beat pattern and notes
+- Several lists, each with songs holding tempo, signature, split, sound, beat pattern,
+  per-beat volumes and notes
 - Reorder, edit, delete; auto-advance after a set number of bars
 - Export and import as JSON
 
@@ -54,6 +71,11 @@ Clicks are scheduled on the Web Audio clock about 120 ms ahead, and the flashes 
 queue in `requestAnimationFrame` against `AudioContext.currentTime`. That keeps the beat steady even
 when the main thread is busy — a plain `setInterval` metronome drifts audibly.
 
+## Support
+
+Blink is free. If it earns its place on your music stand, you can
+[buy us a coffee](https://ko-fi.com/TABifier).
+
 ## Privacy
 
 Everything stays on the device. Settings and setlists go in `localStorage`; the microphone is only
@@ -71,10 +93,13 @@ Then open `http://localhost:8000`.
 
 ## Layout
 
+The version lives in one place, `VERSION` at the top of `js/store.js`; the service worker
+cache name in `sw.js` is bumped with it.
+
 ```
 index.html              markup for all five tabs
 css/app.css             tokens and layout, three themes
-js/store.js             state, persistence, subdivision and tuning tables
+js/store.js             VERSION, state, persistence, split and tuning tables
 js/audio.js             synth voices + lookahead scheduler
 js/flash.js             the beat flash
 js/mic.js               shared microphone, reference counted

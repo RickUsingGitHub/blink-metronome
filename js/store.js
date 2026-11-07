@@ -1,6 +1,7 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
+export const KOFI_URL = 'https://ko-fi.com/TABifier';
 const KEY = 'blink.v1';
 
 /* ---------- event bus ---------- */
@@ -20,20 +21,34 @@ export const bus = {
   }
 };
 
-/* ---------- subdivisions: offsets are fractions of one beat ---------- */
+/* ---------- splits ----------
+   slots: where each note of the pattern falls inside one beat, as a fraction.
+          slots[0] is always 0 — it is the beat boundary the scheduler counts on.
+   rests: indices into slots that are written but not played, so patterns like
+          swing (quaver, rest, quaver) and dotted rhythms keep their real grid. */
+function even(n){ return Array.from({ length:n }, (_, i) => i / n); }
+const TRIPLET = even(3), SIXTEENTH = even(4);
+
 export const SUBS = [
-  { id:'q',   label:'♩',  name:'Quarter',       offsets:[0] },
-  { id:'8',   label:'♫',  name:'Eighths',       offsets:[0, 1/2] },
-  { id:'8t',  label:'3',       name:'Triplets',      offsets:[0, 1/3, 2/3] },
-  { id:'16',  label:'4',       name:'Sixteenths',    offsets:[0, 1/4, 1/2, 3/4] },
-  { id:'8d',  label:'♪.', name:'Dotted + 16th', offsets:[0, 3/4] },
-  { id:'sw',  label:'Sw',      name:'Swing eighths', offsets:[0, 2/3] },
-  { id:'16r', label:'‖',  name:'Off-beat 16ths',offsets:[0, 1/4, 3/4] },
-  { id:'5',   label:'5',       name:'Quintuplets',   offsets:[0, .2, .4, .6, .8] },
-  { id:'6',   label:'6',       name:'Sextuplets',    offsets:[0, 1/6, 2/6, 3/6, 4/6, 5/6] },
-  { id:'7',   label:'7',       name:'Septuplets',    offsets:[0, 1/7, 2/7, 3/7, 4/7, 5/7, 6/7] }
+  { id:'q',   name:'Quarter',                   slots:[0] },
+  { id:'8',   name:'Two quavers',               slots:even(2) },
+  { id:'8t',  name:'Triplet',                   slots:TRIPLET },
+  { id:'sw',  name:'Swing — quaver, rest, quaver', slots:TRIPLET, rests:[1] },
+  { id:'t12', name:'Triplet — first two',       slots:TRIPLET, rests:[2] },
+  { id:'t23', name:'Triplet — rest, then two',  slots:TRIPLET, rests:[0] },
+  { id:'16',  name:'Four semiquavers',          slots:SIXTEENTH },
+  { id:'16a', name:'Quaver, two semiquavers',   slots:SIXTEENTH, rests:[1] },
+  { id:'16b', name:'Two semiquavers, quaver',   slots:SIXTEENTH, rests:[3] },
+  { id:'16r', name:'Semiquaver, quaver, semiquaver', slots:SIXTEENTH, rests:[2] },
+  { id:'8d',  name:'Dotted quaver, semiquaver', slots:SIXTEENTH, rests:[1,2] },
+  { id:'d8',  name:'Semiquaver, dotted quaver', slots:SIXTEENTH, rests:[2,3] },
+  { id:'16o', name:'Rest, three semiquavers',   slots:SIXTEENTH, rests:[0] },
+  { id:'5',   name:'Quintuplets',               slots:even(5) },
+  { id:'6',   name:'Sextuplets',                slots:even(6) },
+  { id:'7',   name:'Septuplets',                slots:even(7) }
 ];
 export const subById = id => SUBS.find(s => s.id === id) || SUBS[0];
+export const isRest = (sub, i) => !!(sub.rests && sub.rests.indexOf(i) >= 0);
 
 export const SOUNDS = [
   { id:'woodblock', name:'Woodblock' },
@@ -76,14 +91,17 @@ export const TUNINGS = [
   { id:'chromatic',name:'Chromatic',         notes:[] }
 ];
 
-export const MODES = ['accent','on','flash','off'];
-export const MODE_LABEL = { accent:'Acc', on:'Click', flash:'Flash', off:'Rest' };
+/* Three sounding tones like the original — high, mid, low — then silent-but-
+   flashing, then nothing at all. */
+export const MODES = ['accent','on','soft','flash','off'];
+export const MODE_LABEL = { accent:'High', on:'Mid', soft:'Low', flash:'Flash', off:'Rest' };
 
 /* ---------- defaults ---------- */
 function defaults(){
   return {
     bpm:120, num:4, den:4, sub:'q',
     pattern:['accent','on','on','on'],
+    volumes:[100,100,100,100],
     soundOn:true, soundId:'woodblock', vol:85, vibrate:false,
     flashTarget:'screen', bright:85, hold:30,
     colAccent:'#ffc83d', colBeat:'#5fd0ff', subFlash:true,
@@ -117,6 +135,19 @@ export function fixPattern(){
   while(p.length < state.num) p.push('on');
   state.pattern = p.map(m => MODES.includes(m) ? m : 'on');
   if(state.num > 0 && state.pattern[0] === 'on' && state.pattern.every(m => m === 'on')) state.pattern[0] = 'accent';
+
+  const v = (Array.isArray(state.volumes) ? state.volumes : []).slice(0, state.num);
+  while(v.length < state.num) v.push(100);
+  state.volumes = v.map(x => {
+    const n = Math.round(Number(x));
+    return Number.isFinite(n) ? clamp(n, 0, 150) : 100;
+  });
+}
+
+/* Volume of one beat as a 0–1.5 multiplier. */
+export function beatGain(i){
+  const v = state.volumes[i];
+  return (Number.isFinite(v) ? v : 100) / 100;
 }
 
 /* ---------- persistence ---------- */
@@ -138,6 +169,7 @@ export function load(){
   state.den   = [1,2,4,8,16].includes(+o.den) ? +o.den : 4;
   state.sub   = SUBS.some(s => s.id === o.sub) ? o.sub : 'q';
   if(Array.isArray(o.pattern)) state.pattern = o.pattern.filter(m => MODES.includes(m));
+  if(Array.isArray(o.volumes)) state.volumes = o.volumes.slice(0, 32);
   fixPattern();
 
   state.soundOn = o.soundOn !== false;
@@ -197,6 +229,9 @@ function cleanSong(s){
   const num = int(s.num, 1, 32, 4);
   let pattern = Array.isArray(s.pattern) ? s.pattern.filter(m => MODES.includes(m)).slice(0, num) : [];
   while(pattern.length < num) pattern.push(pattern.length === 0 ? 'accent' : 'on');
+  const volumes = (Array.isArray(s.volumes) ? s.volumes : []).slice(0, num)
+    .map(x => { const n = Math.round(Number(x)); return Number.isFinite(n) ? clamp(n, 0, 150) : 100; });
+  while(volumes.length < num) volumes.push(100);
   return {
     id: typeof s.id === 'string' ? s.id : 'S' + Math.random().toString(36).slice(2,9),
     name: typeof s.name === 'string' ? s.name.slice(0,80) : 'Untitled',
@@ -204,7 +239,7 @@ function cleanSong(s){
     num, den: [1,2,4,8,16].includes(+s.den) ? +s.den : 4,
     sub: SUBS.some(x => x.id === s.sub) ? s.sub : 'q',
     soundId: SOUNDS.some(x => x.id === s.soundId) ? s.soundId : 'woodblock',
-    pattern,
+    pattern, volumes,
     notes: typeof s.notes === 'string' ? s.notes.slice(0,200) : ''
   };
 }

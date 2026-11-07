@@ -28,7 +28,7 @@
   <!-- ================= METRONOME ================= -->
   <section class="view" id="view-metronome" data-view="metronome">
     <header class="topbar">
-      <div class="brand">Blink<span>.</span></div>
+      <div class="brand">Blink<span>.</span><em class="ver" id="verBadge"></em></div>
       <div class="grow"></div>
       <div class="songname" id="songName" hidden></div>
       <button class="chip-btn" id="stageBtn" type="button" title="Hide everything but the flash">Stage</button>
@@ -90,8 +90,9 @@
       </div>
       <div class="row">
         <span class="lbl">Split</span>
-        <div class="chiprow" id="subRow" role="group" aria-label="Subdivision"></div>
+        <div class="chiprow" id="subRow" role="group" aria-label="Split pattern"></div>
       </div>
+      <div class="row"><span class="subname" id="subName"></span></div>
     </div>
 
     <!-- beat pattern -->
@@ -103,8 +104,20 @@
         <button class="mini" id="patReset" type="button">Reset</button>
       </div>
       <div class="beatgrid" id="beatGrid"></div>
-      <p class="hint">Tap a beat to cycle <b class="c-accent">Accent</b> → <b class="c-beat">Click</b> → <b class="c-mute">Flash</b> (no sound) → <b class="c-off">Rest</b>.</p>
+      <p class="hint">Tap a beat to cycle <b class="c-accent">High</b> → <b class="c-beat">Mid</b> → <b class="c-soft">Low</b> → <b class="c-mute">Flash</b> (no sound) → <b class="c-off">Rest</b>.</p>
     </div>
+
+    <!-- per-beat volume -->
+    <details class="panel acc" id="accLevels">
+      <summary><span class="lbl">Beat volumes</span><span class="sum-val" id="sumLevels">All even</span></summary>
+      <div class="acc-body">
+        <div class="levels" id="levelRows"></div>
+        <div class="row">
+          <button class="mini" id="lvlReset" type="button">All to 100%</button>
+          <span class="note">0% silences that beat but leaves its flash.</span>
+        </div>
+      </div>
+    </details>
 
     <!-- sound -->
     <details class="panel acc" id="accSound">
@@ -367,7 +380,15 @@
       <p class="hint">Space starts and stops. ↑ ↓ change tempo by one, ⇧↑ ⇧↓ by ten. T taps. 1–9 set the beats in a bar. S toggles sound.</p>
     </div>
 
-    <p class="foot">Blink Metronome · <span id="verTag"></span></p>
+    <div class="panel kofi">
+      <div class="panel-head"><span class="lbl">Support</span></div>
+      <p class="hint">Blink is free. If it earns its place on your music stand, you can buy us a coffee.</p>
+      <div class="row">
+        <a class="kofi-btn" id="kofiBtn" href="https://ko-fi.com/TABifier" target="_blank" rel="noopener noreferrer">☕ Support us on Ko-fi</a>
+      </div>
+    </div>
+
+    <p class="foot">Blink Metronome <span id="verTag"></span> · <a id="kofiFoot" href="https://ko-fi.com/TABifier" target="_blank" rel="noopener noreferrer">Ko-fi</a></p>
   </section>
 
 </div>

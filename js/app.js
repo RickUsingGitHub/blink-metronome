@@ -1,6 +1,6 @@
 /* Boot: theme, tabs, transport, wake lock, keyboard, install, service worker. */
 
-import { state, bus, save, load, resetAll, VERSION } from './store.js';
+import { state, bus, save, load, resetAll, VERSION, KOFI_URL } from './store.js';
 import { engine, resume } from './audio.js';
 import { initFlash } from './flash.js';
 import { initMetronome, refreshMetronome, setBpm, setNum } from './ui-metronome.js';
@@ -120,6 +120,9 @@ function init(){
     toast('Cleared');
   });
   $('verTag').textContent = 'v' + VERSION;
+  $('verBadge').textContent = 'v' + VERSION;
+  $('kofiBtn').href = KOFI_URL;
+  $('kofiFoot').href = KOFI_URL;
 
   /* keyboard */
   document.addEventListener('keydown', ev => {

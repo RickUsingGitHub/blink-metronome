@@ -24,6 +24,7 @@ export function loadSong(i, announce){
   state.sub = s.sub;
   state.soundId = s.soundId;
   state.pattern = s.pattern.slice();
+  state.volumes = Array.isArray(s.volumes) ? s.volumes.slice() : s.pattern.map(() => 100);
   barsIntoSong = 0;
   refreshMetronome();
   renderSongs();
@@ -40,6 +41,7 @@ function captureSong(name){
     bpm: state.bpm, num: state.num, den: state.den,
     sub: state.sub, soundId: state.soundId,
     pattern: state.pattern.slice(),
+    volumes: state.volumes.slice(),
     notes: ''
   };
 }
@@ -166,6 +168,9 @@ function saveEditor(){
   const p = s.pattern.slice(0, s.num);
   while(p.length < s.num) p.push(p.length === 0 ? 'accent' : 'on');
   s.pattern = p;
+  const v = (Array.isArray(s.volumes) ? s.volumes : []).slice(0, s.num);
+  while(v.length < s.num) v.push(100);
+  s.volumes = v;
   closeEditor();
   renderSongs(); renderLists(); paintSongName(); save();
   toast('Saved');
@@ -289,7 +294,8 @@ export function initSetlist(){
     if(editing === null) return;
     const s = currentList().songs[editing];
     s.bpm = state.bpm; s.num = state.num; s.den = state.den;
-    s.sub = state.sub; s.soundId = state.soundId; s.pattern = state.pattern.slice();
+    s.sub = state.sub; s.soundId = state.soundId;
+    s.pattern = state.pattern.slice(); s.volumes = state.volumes.slice();
     openEditor(editing);
     renderSongs(); save();
     toast('Took the current metronome settings');

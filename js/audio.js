@@ -2,7 +2,7 @@
    Beats are scheduled on the audio clock; the visual queue is drained in
    requestAnimationFrame against ctx.currentTime, so flashes sit on the beat. */
 
-import { state, bus, subById, clamp, save, today } from './store.js';
+import { state, bus, subById, isRest, clamp, save, today, beatGain } from './store.js';
 
 const LOOKAHEAD = 0.12;   // seconds of audio scheduled ahead
 const TICK_MS   = 25;     // how often the scheduler runs
@@ -63,72 +63,80 @@ function burst(t, { dur, gain, type = 'highpass', freq = 2000, Q = 1 }){
   s.start(t, Math.random() * 0.2); s.stop(t + dur + 0.02);
 }
 
-/* Each voice: (time, gain 0..1, accent, isSubdivision) */
+/* Each voice: (time, gain 0..1, pitch factor). The pitch factor is what gives
+   each beat its tone — high, mid or low, like the three tones on the original. */
 const SYNTH = {
-  woodblock(t, g, acc){
-    tone(t, { type:'triangle', freq: acc ? 1750 : 1180, dur: 0.045, gain: g * 0.9 });
-    burst(t, { dur: 0.014, gain: g * 0.35, type:'bandpass', freq: acc ? 2600 : 1900, Q: 2 });
+  woodblock(t, g, p){
+    tone(t, { type:'triangle', freq: 1180 * p, dur: 0.045, gain: g * 0.9 });
+    burst(t, { dur: 0.014, gain: g * 0.35, type:'bandpass', freq: 1900 * p, Q: 2 });
   },
-  click(t, g, acc){
-    burst(t, { dur: acc ? 0.016 : 0.011, gain: g * (acc ? 1 : 0.7), type:'highpass', freq: acc ? 3200 : 2200 });
+  click(t, g, p){
+    burst(t, { dur: 0.011 * (p > 1 ? 1.4 : 1), gain: g * 0.85, type:'highpass', freq: 2200 * p });
   },
-  beep(t, g, acc){
-    tone(t, { type:'sine', freq: acc ? 1320 : 880, dur: 0.06, gain: g * 0.8 });
+  beep(t, g, p){
+    tone(t, { type:'sine', freq: 880 * p, dur: 0.06, gain: g * 0.8 });
   },
-  clave(t, g, acc){
-    tone(t, { type:'sine', freq: acc ? 3000 : 2400, to: acc ? 2400 : 1900, dur: 0.05, gain: g * 0.85 });
+  clave(t, g, p){
+    tone(t, { type:'sine', freq: 2400 * p, to: 1900 * p, dur: 0.05, gain: g * 0.85 });
   },
-  cowbell(t, g, acc){
-    const f = acc ? 1.22 : 1;
+  cowbell(t, g, p){
     const o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
     const bp = ctx.createBiquadFilter(), gg = ctx.createGain();
     o1.type = o2.type = 'square';
-    o1.frequency.value = 540 * f; o2.frequency.value = 800 * f;
-    bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 2;
+    o1.frequency.value = 540 * p; o2.frequency.value = 800 * p;
+    bp.type = 'bandpass'; bp.frequency.value = 2200 * p; bp.Q.value = 2;
     env(gg, t, g * 0.5, 0.13);
     o1.connect(bp); o2.connect(bp); bp.connect(gg); gg.connect(master);
     o1.start(t); o2.start(t); o1.stop(t + 0.15); o2.stop(t + 0.15);
   },
-  hihat(t, g, acc){
-    burst(t, { dur: acc ? 0.06 : 0.035, gain: g * (acc ? 0.8 : 0.5), type:'highpass', freq: 7200 });
+  hihat(t, g, p){
+    burst(t, { dur: 0.035 * (p > 1 ? 1.6 : 0.85), gain: g * 0.65, type:'highpass', freq: 7200 * Math.sqrt(p) });
   },
-  rim(t, g, acc){
-    burst(t, { dur: 0.028, gain: g * 0.7, type:'bandpass', freq: acc ? 2200 : 1700, Q: 3 });
-    tone(t, { type:'triangle', freq: acc ? 520 : 420, dur: 0.03, gain: g * 0.4 });
+  rim(t, g, p){
+    burst(t, { dur: 0.028, gain: g * 0.7, type:'bandpass', freq: 1700 * p, Q: 3 });
+    tone(t, { type:'triangle', freq: 420 * p, dur: 0.03, gain: g * 0.4 });
   },
-  kick(t, g, acc){
-    tone(t, { type:'sine', freq: acc ? 190 : 160, to: acc ? 62 : 52, dur: 0.13, gain: g * 0.95 });
+  kick(t, g, p){
+    tone(t, { type:'sine', freq: 160 * p, to: 52 * p, dur: 0.13, gain: g * 0.95 });
   },
-  marimba(t, g, acc){
-    const f = acc ? 1046 : 698;
+  marimba(t, g, p){
+    const f = 698 * p;
     tone(t, { type:'sine', freq: f, dur: 0.26, gain: g * 0.7 });
     tone(t, { type:'sine', freq: f * 4, dur: 0.07, gain: g * 0.12 });
   },
-  glass(t, g, acc){
-    const f = acc ? 2350 : 1760;
+  glass(t, g, p){
+    const f = 1760 * p;
     tone(t, { type:'sine', freq: f, dur: 0.3, gain: g * 0.42 });
     tone(t, { type:'sine', freq: f * 1.003, dur: 0.3, gain: g * 0.3 });
   },
-  tick(t, g, acc){
-    tone(t, { type:'square', freq: acc ? 4200 : 3200, dur: 0.008, gain: g * 0.55 });
+  tick(t, g, p){
+    tone(t, { type:'square', freq: 3200 * p, dur: 0.008, gain: g * 0.55 });
   }
 };
 
-function playClick(time, kind){
+/* High / mid / low, plus the quieter subdivision tick. */
+const LEVELS = {
+  accent: { gain: 1.00, pitch: 1.50 },
+  on:     { gain: 0.62, pitch: 1.00 },
+  soft:   { gain: 0.42, pitch: 0.67 },
+  sub:    { gain: 0.20, pitch: 1.25 }
+};
+
+function playClick(time, kind, beat){
   if(!state.soundOn) return;
-  const v = state.vol / 100;
+  const lv = LEVELS[kind] || LEVELS.on;
+  const v = (state.vol / 100) * (beat === undefined ? 1 : beatGain(beat));
   if(v <= 0) return;
-  const level = kind === 'accent' ? 1 : kind === 'on' ? 0.6 : 0.2;
   const fn = SYNTH[state.soundId] || SYNTH.woodblock;
-  try{ fn(time, v * level * 0.9, kind === 'accent', kind === 'sub'); }
+  try{ fn(time, Math.min(1.4, v * lv.gain * 0.9), lv.pitch); }
   catch(err){ /* a dropped click must never stop the transport */ }
 }
 
-export function previewSound(soundId){
+export function previewSound(soundId, kind, beat){
   resume().then(() => {
     const keep = state.soundId, keepOn = state.soundOn;
     state.soundId = soundId; state.soundOn = true;
-    playClick(audioCtx().currentTime + 0.02, 'accent');
+    playClick(audioCtx().currentTime + 0.02, kind || 'accent', beat);
     state.soundId = keep; state.soundOn = keepOn;
   });
 }
@@ -176,21 +184,23 @@ function schedule(){
   for(;;){
     if(++guard > 4000) break;
     if(beatIdx >= state.num) beatIdx = 0;
-    const offs = subById(state.sub).offsets;
+    const sub = subById(state.sub);
+    const offs = sub.slots;
     if(offIdx >= offs.length) offIdx = 0;
     const bd = beatDur();
     const t = beatStart + offs[offIdx] * bd;
     if(t >= ctx.currentTime + LOOKAHEAD) break;
 
     const down = offIdx === 0;
+    const rest = isRest(sub, offIdx);     // written in the split, but not played
     const countingIn = barIdx < 0;
     const mode = countingIn ? (beatIdx === 0 ? 'accent' : 'on') : (state.pattern[beatIdx] || 'on');
     const muted = !countingIn && isMutedBar(barIdx);
 
     if(mode !== 'off'){
-      const sounds = !muted && (down ? (mode === 'accent' || mode === 'on') : mode !== 'flash');
-      if(sounds) playClick(t, down ? mode : 'sub');
-      const flashes = !(muted && state.gapFlash) && (down || state.subFlash);
+      // 'flash' is the silent-but-visible beat; everything else sounds
+      if(!muted && !rest && mode !== 'flash') playClick(t, down ? mode : 'sub', countingIn ? undefined : beatIdx);
+      const flashes = !rest && !(muted && state.gapFlash) && (down || state.subFlash);
       queue.push({
         t,
         kind: flashes ? (down ? (mode === 'accent' ? 'accent' : 'on') : 'sub') : 'none',

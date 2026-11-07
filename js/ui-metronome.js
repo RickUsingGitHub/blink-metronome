@@ -3,7 +3,7 @@
 
 import {
   state, bus, save, SUBS, SOUNDS, MODES, MODE_LABEL,
-  subById, tempoMark, clamp, fmtTime, fixPattern
+  subById, isRest, tempoMark, clamp, fmtTime, fixPattern
 } from './store.js';
 import { engine, previewSound } from './audio.js';
 import { $, $$, toast, repeat, segment, segmentSet } from './ui.js';
@@ -90,14 +90,27 @@ export function setNum(n){
   queueSave();
 }
 
+/* Each split is drawn as its own rhythm: a filled block per note, a hollow one
+   per written rest, each block as wide as the note lasts. */
+function rhythmBar(s){
+  const n = s.slots.length;
+  let html = '<span class="rhy">';
+  for(let i = 0; i < n; i++){
+    const w = ((i + 1 < n ? s.slots[i + 1] : 1) - s.slots[i]) * 100;
+    html += '<i class="' + (isRest(s, i) ? 'r' : 'h') + '" style="flex:' + w.toFixed(2) + '"></i>';
+  }
+  return html + '</span>';
+}
+
 function buildSubRow(){
   const row = $('subRow');
   row.textContent = '';
   SUBS.forEach(s => {
     const b = document.createElement('button');
     b.type = 'button';
+    b.className = 'subchip';
     b.dataset.sub = s.id;
-    b.textContent = s.label;
+    b.innerHTML = rhythmBar(s);
     b.title = s.name;
     b.setAttribute('aria-label', s.name);
     b.setAttribute('aria-pressed', String(s.id === state.sub));
@@ -108,8 +121,16 @@ function buildSubRow(){
     if(!b) return;
     state.sub = b.dataset.sub;
     $$('button', row).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    paintSubName();
     queueSave();
   };
+  paintSubName();
+}
+function paintSubName(){
+  const el = $('subName');
+  if(el) el.textContent = subById(state.sub).name;
+  const sel = $('subRow').querySelector('[aria-pressed="true"]');
+  if(sel && sel.scrollIntoView) sel.scrollIntoView({ block:'nearest', inline:'nearest' });
 }
 
 /* ---------------- beat pattern ---------------- */
@@ -121,20 +142,80 @@ function buildBeatGrid(){
     b.type = 'button';
     b.className = 'beatbtn';
     b.dataset.i = i;
-    b.dataset.mode = state.pattern[i];
-    b.innerHTML = '<span class="n">' + (i + 1) + '</span>' +
-                  '<span class="m">' + MODE_LABEL[state.pattern[i]] + '</span>' +
+    b.innerHTML = '<span class="lv"></span>' +
+                  '<span class="n">' + (i + 1) + '</span>' +
+                  '<span class="m"></span>' +
                   '<span class="dot"></span>';
-    b.setAttribute('aria-label', 'Beat ' + (i + 1) + ': ' + MODE_LABEL[state.pattern[i]]);
     grid.appendChild(b);
+    paintBeat(i);
   }
+  buildLevelRows();
 }
 function paintBeat(i){
   const b = $('beatGrid').children[i];
   if(!b) return;
-  b.dataset.mode = state.pattern[i];
-  b.querySelector('.m').textContent = MODE_LABEL[state.pattern[i]];
-  b.setAttribute('aria-label', 'Beat ' + (i + 1) + ': ' + MODE_LABEL[state.pattern[i]]);
+  const mode = state.pattern[i], vol = state.volumes[i];
+  b.dataset.mode = mode;
+  b.querySelector('.m').textContent = MODE_LABEL[mode];
+  b.querySelector('.lv').textContent = (vol === 100 || mode === 'flash' || mode === 'off') ? '' : vol + '%';
+  b.setAttribute('aria-label', 'Beat ' + (i + 1) + ': ' + MODE_LABEL[mode] +
+    (vol === 100 ? '' : ', volume ' + vol + ' per cent'));
+  paintLevelRow(i);
+}
+
+/* ---------------- per-beat volume ---------------- */
+function buildLevelRows(){
+  const box = $('levelRows');
+  if(!box) return;
+  box.textContent = '';
+  for(let i = 0; i < state.num; i++){
+    const row = document.createElement('div');
+    row.className = 'lvrow';
+    row.dataset.i = i;
+    row.innerHTML =
+      '<span class="n">' + (i + 1) + '</span>' +
+      '<span class="tag"></span>' +
+      '<input type="range" min="0" max="150" step="5" aria-label="Volume of beat ' + (i + 1) + '">' +
+      '<span class="pc"></span>';
+    const sl = row.querySelector('input');
+    sl.value = state.volumes[i];
+    sl.addEventListener('input', e => {
+      state.volumes[i] = +e.target.value;
+      paintBeat(i);
+      sumLevels();
+      queueSave();
+    });
+    sl.addEventListener('change', () => {
+      if(!engine.running && state.pattern[i] !== 'flash' && state.pattern[i] !== 'off'){
+        previewBeat(i);
+      }
+    });
+    box.appendChild(row);
+    paintLevelRow(i);
+  }
+  sumLevels();
+}
+function paintLevelRow(i){
+  const box = $('levelRows');
+  if(!box) return;
+  const row = box.children[i];
+  if(!row) return;
+  row.dataset.mode = state.pattern[i];
+  row.querySelector('.tag').textContent = MODE_LABEL[state.pattern[i]];
+  row.querySelector('.pc').textContent = state.volumes[i] + '%';
+  const sl = row.querySelector('input');
+  if(+sl.value !== state.volumes[i]) sl.value = state.volumes[i];
+}
+function sumLevels(){
+  const el = $('sumLevels');
+  if(!el) return;
+  const odd = state.volumes.slice(0, state.num).filter(v => v !== 100).length;
+  el.textContent = odd === 0 ? 'All even' : odd + (odd === 1 ? ' beat set' : ' beats set');
+}
+function previewBeat(i){
+  const mode = state.pattern[i];
+  if(!state.soundOn || mode === 'flash' || mode === 'off') return;   // silent means silent
+  previewSound(state.soundId, mode, i);
 }
 
 let markedBeat = -1;
@@ -292,7 +373,15 @@ export function initMetronome(){
     const i = +b.dataset.i;
     state.pattern[i] = MODES[(MODES.indexOf(state.pattern[i]) + 1) % MODES.length];
     paintBeat(i);
+    sumLevels();
+    if(!engine.running) previewBeat(i);
     queueSave();
+  });
+  $('lvlReset').addEventListener('click', () => {
+    state.volumes = state.volumes.map(() => 100);
+    for(let i = 0; i < state.num; i++) paintBeat(i);
+    sumLevels();
+    save();
   });
   $('patAllFlash').addEventListener('click', () => {
     state.pattern = state.pattern.map(() => 'flash');
