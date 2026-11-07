@@ -142,6 +142,7 @@ function init(){
   const unlock = () => { resume(); document.removeEventListener('pointerdown', unlock); };
   document.addEventListener('pointerdown', unlock, { once:true });
 
+  wireUpdateBar();
   paintPlay();
   showTab('metronome');
 }
@@ -162,13 +163,52 @@ window.addEventListener('beforeinstallprompt', ev => {
   }
 });
 
-/* ---------- service worker ---------- */
+/* ---------- service worker and version updates ----------
+   A new worker takes over as soon as it installs, but this page is still running
+   the old code until it reloads. Say so and let the user pick the moment — an
+   automatic reload would cut off a bar mid-practice. */
+function offerUpdate(){
+  const bar = $('updateBar');
+  if(bar) bar.hidden = false;
+}
+function wireUpdateBar(){
+  $('updateBtn').addEventListener('click', () => { location.reload(); });
+  $('updateLater').addEventListener('click', () => { $('updateBar').hidden = true; });
+}
+
 if('serviceWorker' in navigator){
+  // true on a repeat visit; false the first time, when claiming is not an update
+  const hadController = !!navigator.serviceWorker.controller;
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(hadController) offerUpdate();
+  });
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').then(
-      () => { const el = $('swState'); if(el) el.textContent = 'Ready to run offline.'; },
-      () => { const el = $('swState'); if(el) el.textContent = 'Offline mode unavailable.'; }
-    );
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      const el = $('swState');
+      if(el) el.textContent = 'Ready to run offline.';
+
+      const watch = w => {
+        if(!w) return;
+        w.addEventListener('statechange', () => {
+          if((w.state === 'installed' || w.state === 'activated') && hadController) offerUpdate();
+        });
+      };
+      if(reg.waiting && hadController) offerUpdate();
+      watch(reg.installing);
+      reg.addEventListener('updatefound', () => watch(reg.installing));
+
+      // look for a new version whenever the app comes back to the foreground
+      document.addEventListener('visibilitychange', () => {
+        if(document.visibilityState === 'visible'){
+          try{ reg.update(); }catch(err){}
+        }
+      });
+    }, () => {
+      const el = $('swState');
+      if(el) el.textContent = 'Offline mode unavailable.';
+    });
   });
 }
 

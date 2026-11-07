@@ -255,6 +255,16 @@ details.acc[open] .sum-val{display:none}
   padding:6px 2px;border-radius:8px;cursor:pointer;letter-spacing:.02em}
 .tabs button[aria-selected="true"]{color:var(--accent);background:var(--panel)}
 
+/* ---------- update bar ---------- */
+.updatebar{flex:0 0 auto;display:flex;align-items:center;gap:9px;
+  background:var(--panel-3);border-top:1px solid var(--accent);
+  padding-left:max(14px,env(safe-area-inset-left,0px));
+  padding-right:max(14px,env(safe-area-inset-right,0px));
+  padding-block:9px;z-index:70}
+.updatebar .ub-txt{flex:1;min-width:0;font-size:.82rem;font-weight:600}
+.updatebar .mini{border-color:var(--accent);color:var(--accent)}
+.updatebar .mini.ghost{border-color:var(--line);color:var(--dim)}
+
 /* ---------- toast ---------- */
 .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
   bottom:calc(112px + env(safe-area-inset-bottom,0px));z-index:120;
@@ -290,7 +300,8 @@ details.acc[open] .sum-val{display:none}
 .kofi-btn:hover{filter:brightness(1.06)}
 
 /* ---------- stage mode ---------- */
-body.stage .panel,body.stage .silentcard,body.stage .session,body.stage .tabs,body.stage .readout{display:none}
+body.stage .panel,body.stage .silentcard,body.stage .session,body.stage .tabs,
+body.stage .readout,body.stage .updatebar{display:none}
 body.stage .dial{width:min(76vw,330px)}
 body.stage .shell{display:flex;align-items:center}
 body.stage .view{justify-content:center;flex:1}

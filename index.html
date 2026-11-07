@@ -393,6 +393,14 @@
 
 </div>
 
+<!-- a new version has taken over; the reload is the user's to make, never automatic,
+     because reloading mid-bar would stop the metronome -->
+<div class="updatebar" id="updateBar" role="status" hidden>
+  <span class="ub-txt">New version ready.</span>
+  <button class="mini" id="updateBtn" type="button">Reload</button>
+  <button class="mini ghost" id="updateLater" type="button">Later</button>
+</div>
+
 <!-- transport + tabs -->
 <div class="dock">
   <button class="play" id="playBtn" type="button" data-on="false">Start</button>
