@@ -1,6 +1,6 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.2.3';
+export const VERSION = '1.2.4';
 export const KOFI_URL = 'https://ko-fi.com/rickapps';
 const KEY = 'blink.v1';
 
@@ -48,6 +48,32 @@ export const SUBS = [
   { id:'7',   name:'Septuplets',                slots:even(7) }
 ];
 export const subById = id => SUBS.find(s => s.id === id) || SUBS[0];
+
+/* Splits divide one denominator unit, regardless of the BPM display setting.
+   Compound metres still use the app's individual denominator pulses. */
+const NOTE_NAMES = {
+  1:'semibreve', 2:'minim', 4:'crotchet', 8:'quaver',
+  16:'semiquaver', 32:'demisemiquaver', 64:'hemidemisemiquaver'
+};
+const UNIT_NAMES = {
+  1:'Whole note (semibreve)', 2:'Half note (minim)',
+  4:'Quarter note (crotchet)', 8:'Eighth note (quaver)',
+  16:'Sixteenth note (semiquaver)'
+};
+export function subName(id, den){
+  const sub = subById(id);
+  const unit = UNIT_NAMES[den] ? Number(den) : 4;
+  if(sub.id === 'q') return UNIT_NAMES[unit];
+  if(sub.id === 'sw') return 'Swing — first and last of triplet';
+  // Replace once: a quaver can become a semiquaver without being replaced again.
+  return sub.name.replace(/semiquavers?|quavers?/gi, word => {
+    const divisor = word.toLowerCase().startsWith('semi') ? 4 : 2;
+    let name = NOTE_NAMES[unit * divisor] + (word.endsWith('s') ? 's' : '');
+    if(word[0] === word[0].toUpperCase()) name = name[0].toUpperCase() + name.slice(1);
+    return name;
+  });
+}
+
 export const isRest = (sub, i) => !!(sub.rests && sub.rests.indexOf(i) >= 0);
 
 export const SOUNDS = [

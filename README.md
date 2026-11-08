@@ -17,7 +17,9 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
   **High → Mid → Low → Flash (silent) → Rest**
 - Per-beat volume, 0–150%, so one beat can sit back or push forward on its own
 - 16 split patterns, drawn as their own rhythm rather than labelled with a number —
-  including the ones with a written rest inside the split:
+  including the ones with a written rest inside the split. Names below assume a
+  denominator of 4; the app adjusts note names to the selected denominator
+  (for example, no split in 4/8 is an eighth note / quaver):
 
   | | |
   |---|---|

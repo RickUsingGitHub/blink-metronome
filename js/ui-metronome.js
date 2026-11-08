@@ -3,7 +3,7 @@
 
 import {
   state, bus, save, SUBS, SOUNDS, MODES, MODE_LABEL,
-  subById, isRest, tempoMark, clamp, fmtTime, fixPattern
+  subName, isRest, tempoMark, clamp, fmtTime, fixPattern
 } from './store.js';
 import { engine, previewSound } from './audio.js';
 import { $, $$, toast, repeat, segment, segmentSet } from './ui.js';
@@ -111,8 +111,9 @@ function buildSubRow(){
     b.className = 'subchip';
     b.dataset.sub = s.id;
     b.innerHTML = rhythmBar(s);
-    b.title = s.name;
-    b.setAttribute('aria-label', s.name);
+    const name = subName(s.id, state.den);
+    b.title = name;
+    b.setAttribute('aria-label', name);
     b.setAttribute('aria-pressed', String(s.id === state.sub));
     row.appendChild(b);
   });
@@ -128,7 +129,7 @@ function buildSubRow(){
 }
 function paintSubName(){
   const el = $('subName');
-  if(el) el.textContent = subById(state.sub).name;
+  if(el) el.textContent = subName(state.sub, state.den);
   const sel = $('subRow').querySelector('[aria-pressed="true"]');
   if(sel && sel.scrollIntoView) sel.scrollIntoView({ block:'nearest', inline:'nearest' });
 }
@@ -363,6 +364,7 @@ export function initMetronome(){
   segment($('denSeg'), 'den', v => {
     state.den = +v;
     segmentSet($('denSeg'), 'den', state.den);
+    buildSubRow();
     queueSave();
   });
 
