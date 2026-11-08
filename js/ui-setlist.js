@@ -3,7 +3,7 @@
 
 import {
   state, bus, save, currentList, newId, cleanSong,
-  SUBS, SOUNDS, subById, clamp
+  SUBS, SOUNDS, subName, clamp
 } from './store.js';
 import { engine } from './audio.js';
 import { $, $$, toast } from './ui.js';
@@ -82,14 +82,14 @@ function renderSongs(){
     main.className = 'song-main';
     main.tabIndex = 0;
     main.setAttribute('role', 'button');
-    const sub = subById(s.sub);
+    const splitName = subName(s.sub, s.den);
     const snd = SOUNDS.find(x => x.id === s.soundId);
     main.innerHTML =
       '<div class="song-name"></div>' +
       '<div class="song-meta"></div>';
     main.querySelector('.song-name').textContent = (i + 1) + '. ' + s.name;
     main.querySelector('.song-meta').textContent =
-      s.bpm + ' BPM · ' + s.num + '/' + s.den + ' · ' + sub.name +
+      s.bpm + ' BPM · ' + s.num + '/' + s.den + ' · ' + splitName +
       (snd ? ' · ' + snd.name : '') + (s.notes ? ' · ' + s.notes : '');
     main.addEventListener('click', () => loadSong(i, true));
     main.addEventListener('keydown', ev => {
