@@ -185,7 +185,17 @@ details.acc[open] .sum-val{display:none}
 .beatbtn[data-mode="flash"] .dot{background:var(--mute)}
 .beatbtn[data-mode="flash"] .m{color:var(--mute)}
 .beatbtn[data-mode="off"]{opacity:.42}
+/* Invert the whole active tile for a clear pulse in every theme.
+   Rest tiles keep their subdued position marker rather than flashing. */
 .beatbtn.now{background:var(--panel-3);border-color:var(--faint)}
+.beatbtn.now:not([data-mode="off"]){
+  background:var(--fg);color:var(--bg);border-color:var(--fg);
+  box-shadow:0 0 0 2px var(--fg);
+  z-index:91; /* Keep the active tile readable above the whole-screen flash. */
+}
+.beatbtn.now:not([data-mode="off"]) .m,
+.beatbtn.now:not([data-mode="off"]) .lv{color:inherit}
+.beatbtn.now:not([data-mode="off"]) .dot{background:currentColor}
 
 .session{display:flex;align-items:baseline;gap:6px;justify-content:center;font-size:.72rem;color:var(--faint);
   font-variant-numeric:tabular-nums;padding:2px 0 2px}
