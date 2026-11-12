@@ -48,7 +48,7 @@
     <div class="stage" id="stageArea">
       <div class="dial" id="dial" role="slider" title="Turn to change the tempo, tap to type one"
            aria-label="Tempo — turn to change, tap to type a value"
-           aria-valuemin="20" aria-valuemax="400" aria-valuenow="120" tabindex="0">
+           aria-valuemin="20" aria-valuemax="500" aria-valuenow="120" tabindex="0">
         <div class="dial-glow" id="dialGlow"></div>
         <svg class="dial-ticks" viewBox="0 0 200 200" aria-hidden="true"><g id="dialTicks"></g></svg>
         <div class="dial-face">
@@ -71,7 +71,7 @@
     <div class="panel">
       <div class="row">
         <button class="step" id="bpmMinus" type="button" aria-label="Slower">−</button>
-        <input type="range" id="bpmRange" min="20" max="400" step="1" value="120" aria-label="Tempo">
+        <input type="range" id="bpmRange" min="20" max="500" step="1" value="120" aria-label="Tempo">
         <button class="step" id="bpmPlus" type="button" aria-label="Faster">+</button>
         <button class="tapbtn" id="tapBtn" type="button">Tap</button>
       </div>
@@ -215,7 +215,7 @@
           <span class="sigval" id="rampToVal">160</span>
         </div>
         <div class="row">
-          <input type="range" id="rampToRange" min="20" max="400" step="1" value="160" aria-label="Ramp target tempo">
+          <input type="range" id="rampToRange" min="20" max="500" step="1" value="160" aria-label="Ramp target tempo">
         </div>
       </div>
     </details>
@@ -268,7 +268,7 @@
         <button class="mini" id="songEditClose" type="button">Close</button></div>
       <div class="acc-body">
         <div class="row"><span class="lbl">Name</span><input class="text" id="seName" type="text" placeholder="Song name"></div>
-        <div class="row"><span class="lbl">Tempo</span><input class="text num" id="seBpm" type="number" min="20" max="400"><span class="lbl">BPM</span></div>
+        <div class="row"><span class="lbl">Tempo</span><input class="text num" id="seBpm" type="number" min="20" max="500"><span class="lbl">BPM</span></div>
         <div class="row"><span class="lbl">Signature</span>
           <input class="text num" id="seNum" type="number" min="1" max="32">
           <span class="lbl">/</span>
@@ -442,7 +442,7 @@
       <button class="mini" id="bpmCancel" type="button">Cancel</button>
     </div>
     <div class="keyreadout"><span id="bpmEntry">120</span><small>BPM</small></div>
-    <div class="keyhint" id="bpmHint">20 to 400</div>
+    <div class="keyhint" id="bpmHint">20 to 500</div>
     <div class="keypad" id="bpmPad">
       <button type="button" data-k="1">1</button>
       <button type="button" data-k="2">2</button>

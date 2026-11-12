@@ -11,7 +11,7 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 ## What's in it
 
 **Metronome**
-- 20–400 BPM: turn the dial, or tap it to type a tempo on a keypad; slider, ± buttons, tap tempo
+- 20–500 BPM: turn the dial, or tap it to type a tempo on a keypad; slider, ± buttons, tap tempo
 - Time signatures from 1 to 32 beats, over 1 / 2 / 4 / 8 / 16
 - Three sounding tones per beat — each beat cycles
   **High → Mid → Low → Flash (silent) → Rest**

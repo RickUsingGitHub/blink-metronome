@@ -86,6 +86,8 @@ button,input,select{font-family:inherit}
   background:radial-gradient(circle at 50% 40%,var(--panel-2),var(--panel) 72%);
   border:2px solid var(--line);display:grid;place-items:center;touch-action:none;cursor:ns-resize;user-select:none}
 .dial-glow{position:absolute;inset:-16px;border-radius:50%;opacity:0;background:var(--beat);filter:blur(16px);pointer-events:none;will-change:opacity}
+/* the whole circle is the tap target, so acknowledge a press anywhere on it */
+.dial.pressed{background:radial-gradient(circle at 50% 40%,var(--panel-3),var(--panel-2) 72%)}
 .dial-ticks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .dial-ticks line{stroke:var(--line);stroke-width:2;stroke-linecap:round}
 .dial-ticks line.on{stroke:var(--accent)}

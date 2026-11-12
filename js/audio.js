@@ -2,7 +2,7 @@
    Beats are scheduled on the audio clock; the visual queue is drained in
    requestAnimationFrame against ctx.currentTime, so flashes sit on the beat. */
 
-import { state, bus, subById, isRest, clamp, save, today, beatGain } from './store.js';
+import { state, bus, subById, isRest, clamp, save, today, beatGain, BPM_MIN, BPM_MAX } from './store.js';
 
 const LOOKAHEAD = 0.12;   // seconds of audio scheduled ahead
 const TICK_MS   = 25;     // how often the scheduler runs
@@ -170,7 +170,7 @@ function onNewBar(){
       rampBarCount = 0;
       const dir = Math.sign(state.rampTo - state.bpm);
       if(dir !== 0){
-        const next = clamp(state.bpm + dir * state.rampBy, 20, 400);
+        const next = clamp(state.bpm + dir * state.rampBy, BPM_MIN, BPM_MAX);
         state.bpm = dir > 0 ? Math.min(next, state.rampTo) : Math.max(next, state.rampTo);
         bus.emit('bpm', state.bpm);
       }
@@ -210,6 +210,8 @@ function schedule(){
       queue.push({ t, kind:'none', beat: beatIdx, bar: barIdx, down: true, muted });
     }
 
+    if(queue.length > 512) queue.splice(0, queue.length - 512);   // see frame()
+
     offIdx++;
     if(offIdx >= offs.length){
       offIdx = 0;
@@ -229,6 +231,10 @@ function frame(){
   const now = ctx.currentTime;
   while(queue.length && queue[0].t <= now + 0.004){
     const e = queue.shift();
+    // The page is not painted while it is hidden, so frames stop arriving and
+    // these pile up. Beats whose moment has passed are dropped rather than
+    // fired all at once when the page comes back.
+    if(now - e.t > 0.25) continue;
     if(e.down && e.bar !== lastShownBar){
       lastShownBar = e.bar;
       bus.emit('bar', { bar: e.bar });

@@ -3,7 +3,7 @@
 
 import {
   state, bus, save, currentList, newId, cleanSong,
-  SUBS, SOUNDS, subName, clamp
+  SUBS, SOUNDS, subName, clamp, BPM_MIN, BPM_MAX
 } from './store.js';
 import { engine } from './audio.js';
 import { $, $$, toast } from './ui.js';
@@ -160,7 +160,7 @@ function saveEditor(){
   const s = list.songs[editing];
   if(!s) return;
   s.name  = ($('seName').value || 'Untitled').slice(0, 80);
-  s.bpm   = clamp(Math.round(+$('seBpm').value || 120), 20, 400);
+  s.bpm   = clamp(Math.round(+$('seBpm').value || 120), BPM_MIN, BPM_MAX);
   s.num   = clamp(Math.round(+$('seNum').value || 4), 1, 32);
   const den = Math.round(+$('seDen').value || 4);
   s.den   = [1,2,4,8,16].includes(den) ? den : 4;

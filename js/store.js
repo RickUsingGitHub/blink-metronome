@@ -1,8 +1,12 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.3.0';
+export const VERSION = '1.4.0';
 export const KOFI_URL = 'https://ko-fi.com/rickapps';
 const KEY = 'blink.v1';
+
+/* The tempo range, in one place: the HTML inputs carry the same numbers. */
+export const BPM_MIN = 20;
+export const BPM_MAX = 500;
 
 /* ---------- event bus ---------- */
 const handlers = new Map();
@@ -190,7 +194,7 @@ export function load(){
   try{ o = JSON.parse(raw); }catch(err){ return; }
   if(!o || typeof o !== 'object') return;
 
-  state.bpm   = int(o.bpm, 20, 400, 120);
+  state.bpm   = int(o.bpm, BPM_MIN, BPM_MAX, 120);
   state.num   = int(o.num, 1, 32, 4);
   state.den   = [1,2,4,8,16].includes(+o.den) ? +o.den : 4;
   state.sub   = SUBS.some(s => s.id === o.sub) ? o.sub : 'q';
@@ -218,7 +222,7 @@ export function load(){
   state.rampOn  = !!o.rampOn;
   state.rampBy  = int(o.rampBy, 1, 20, 2);
   state.rampEvery = int(o.rampEvery, 1, 32, 4);
-  state.rampTo  = int(o.rampTo, 20, 400, 160);
+  state.rampTo  = int(o.rampTo, BPM_MIN, BPM_MAX, 160);
 
   state.theme = ['dark','black','light'].includes(o.theme) ? o.theme : null;
   state.wake  = o.wake !== false;
@@ -261,7 +265,7 @@ function cleanSong(s){
   return {
     id: typeof s.id === 'string' ? s.id : 'S' + Math.random().toString(36).slice(2,9),
     name: typeof s.name === 'string' ? s.name.slice(0,80) : 'Untitled',
-    bpm: int(s.bpm, 20, 400, 120),
+    bpm: int(s.bpm, BPM_MIN, BPM_MAX, 120),
     num, den: [1,2,4,8,16].includes(+s.den) ? +s.den : 4,
     sub: SUBS.some(x => x.id === s.sub) ? s.sub : 'q',
     soundId: SOUNDS.some(x => x.id === s.soundId) ? s.soundId : 'woodblock',

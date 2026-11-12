@@ -3,7 +3,7 @@
 
 import {
   state, bus, save, SUBS, SOUNDS, MODES, MODE_LABEL,
-  subName, isRest, tempoMark, clamp, fmtTime, fixPattern
+  subName, isRest, tempoMark, clamp, fmtTime, fixPattern, BPM_MIN, BPM_MAX
 } from './store.js';
 import { engine, previewSound } from './audio.js';
 import { $, $$, toast, repeat, segment, segmentSet } from './ui.js';
@@ -14,7 +14,7 @@ function queueSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 400)
 
 /* ---------------- tempo ---------------- */
 export function setBpm(v, quiet){
-  state.bpm = clamp(Math.round(v), 20, 400);
+  state.bpm = clamp(Math.round(v), BPM_MIN, BPM_MAX);
   $('bpmNum').textContent = state.bpm;
   $('bpmRange').value = state.bpm;
   $('tempoMark').textContent = tempoMark(state.bpm);
@@ -39,28 +39,43 @@ function paintTicks(){
     }
   }
   const kids = g.children;
-  const lit = Math.round((state.bpm - 20) / 380 * kids.length);
+  const lit = Math.round((state.bpm - BPM_MIN) / (BPM_MAX - BPM_MIN) * kids.length);
   for(let i = 0; i < kids.length; i++) kids[i].classList.toggle('on', i < lit);
 }
 
 /* The dial does two things with one gesture: turn it to nudge the tempo, or
-   tap it to type one. A tap is a press that barely moved and ended quickly. */
+   tap anywhere on it to type one.
+
+   The whole circle is the tap target, so what matters is telling the two
+   apart. A finger never lands perfectly still, so nothing counts as a turn
+   until the pointer has travelled past the slop below — before that the
+   tempo does not move either, so a wobbly tap near the rim cannot nudge the
+   tempo on its way to opening the keypad. Anything that never turns is a
+   tap, however long it was held. */
+const SLOP = 16;        // CSS pixels of finger wobble allowed before it is a turn
+
 function initDial(){
   const dial = $('dial');
-  let dragging = false, lastAngle = 0, acc = 0, moved = 0, downAt = 0, sx = 0, sy = 0;
+  let down = false, turning = false, lastAngle = 0, acc = 0, sx = 0, sy = 0;
   const angleAt = ev => {
     const r = dial.getBoundingClientRect();
     return Math.atan2(ev.clientY - (r.top + r.height / 2), ev.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
   };
   dial.addEventListener('pointerdown', ev => {
-    dragging = true; acc = 0; moved = 0; downAt = performance.now();
+    down = true; turning = false; acc = 0;
     sx = ev.clientX; sy = ev.clientY;
     lastAngle = angleAt(ev);
-    dial.setPointerCapture(ev.pointerId);
+    dial.classList.add('pressed');
+    try{ dial.setPointerCapture(ev.pointerId); }catch(err){}
   });
   dial.addEventListener('pointermove', ev => {
-    if(!dragging) return;
-    moved = Math.max(moved, Math.hypot(ev.clientX - sx, ev.clientY - sy));
+    if(!down) return;
+    if(!turning){
+      if(Math.hypot(ev.clientX - sx, ev.clientY - sy) < SLOP) return;   // still a tap
+      turning = true;
+      lastAngle = angleAt(ev);        // start the turn from here, not from the press
+      return;
+    }
     const a = angleAt(ev);
     let d = a - lastAngle;
     if(d > 180) d -= 360;
@@ -71,12 +86,12 @@ function initDial(){
     if(steps){ acc -= steps * 3.5; setBpm(state.bpm + steps); }
   });
   const end = ev => {
-    if(!dragging) return;
-    dragging = false;
+    if(!down) return;
+    down = false;
+    dial.classList.remove('pressed');
     try{ dial.releasePointerCapture(ev.pointerId); }catch(err){}
-    const tap = moved < 9 && performance.now() - downAt < 500;
     // in stage mode the dial is the transport, so leave that gesture alone
-    if(tap && !document.body.classList.contains('stage')) openBpmPad();
+    if(!turning && !document.body.classList.contains('stage')) openBpmPad();
   };
   dial.addEventListener('pointerup', end);
   dial.addEventListener('pointercancel', end);
@@ -106,17 +121,18 @@ function padValue(){ return entry === '' ? NaN : parseInt(entry, 10); }
 
 function paintPad(){
   const v = padValue();
-  const valid = Number.isFinite(v) && v >= 20 && v <= 400;
+  const valid = Number.isFinite(v) && v >= BPM_MIN && v <= BPM_MAX;
   const read = $('bpmEntry');
   read.textContent = entry === '' ? String(state.bpm) : entry;
   read.parentElement.classList.toggle('placeholder', entry === '');
   $('bpmOk').disabled = !valid;
   const hint = $('bpmHint');
   if(entry === ''){
-    hint.textContent = '20 to 400';
+    hint.textContent = BPM_MIN + ' to ' + BPM_MAX;
     hint.classList.remove('bad');
   }else if(!valid){
-    hint.textContent = v > 400 ? '400 is as fast as it goes' : '20 is as slow as it goes';
+    hint.textContent = v > BPM_MAX ? BPM_MAX + ' is as fast as it goes'
+                                   : BPM_MIN + ' is as slow as it goes';
     hint.classList.add('bad');
   }else{
     hint.textContent = tempoMark(v);
@@ -132,7 +148,7 @@ function padKey(k){
 }
 function commitPad(){
   const v = padValue();
-  if(!(v >= 20 && v <= 400)) return;
+  if(!(v >= BPM_MIN && v <= BPM_MAX)) return;
   setBpm(v);
   save();
   closeBpmPad();
