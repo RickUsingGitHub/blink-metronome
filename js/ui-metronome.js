@@ -43,20 +43,24 @@ function paintTicks(){
   for(let i = 0; i < kids.length; i++) kids[i].classList.toggle('on', i < lit);
 }
 
-/* rotary drag on the dial */
+/* The dial does two things with one gesture: turn it to nudge the tempo, or
+   tap it to type one. A tap is a press that barely moved and ended quickly. */
 function initDial(){
   const dial = $('dial');
-  let dragging = false, lastAngle = 0, acc = 0;
+  let dragging = false, lastAngle = 0, acc = 0, moved = 0, downAt = 0, sx = 0, sy = 0;
   const angleAt = ev => {
     const r = dial.getBoundingClientRect();
     return Math.atan2(ev.clientY - (r.top + r.height / 2), ev.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
   };
   dial.addEventListener('pointerdown', ev => {
-    dragging = true; acc = 0; lastAngle = angleAt(ev);
+    dragging = true; acc = 0; moved = 0; downAt = performance.now();
+    sx = ev.clientX; sy = ev.clientY;
+    lastAngle = angleAt(ev);
     dial.setPointerCapture(ev.pointerId);
   });
   dial.addEventListener('pointermove', ev => {
     if(!dragging) return;
+    moved = Math.max(moved, Math.hypot(ev.clientX - sx, ev.clientY - sy));
     const a = angleAt(ev);
     let d = a - lastAngle;
     if(d > 180) d -= 360;
@@ -70,6 +74,9 @@ function initDial(){
     if(!dragging) return;
     dragging = false;
     try{ dial.releasePointerCapture(ev.pointerId); }catch(err){}
+    const tap = moved < 9 && performance.now() - downAt < 500;
+    // in stage mode the dial is the transport, so leave that gesture alone
+    if(tap && !document.body.classList.contains('stage')) openBpmPad();
   };
   dial.addEventListener('pointerup', end);
   dial.addEventListener('pointercancel', end);
@@ -77,6 +84,76 @@ function initDial(){
     const big = ev.shiftKey ? 10 : 1;
     if(ev.key === 'ArrowUp' || ev.key === 'ArrowRight'){ ev.preventDefault(); setBpm(state.bpm + big); }
     else if(ev.key === 'ArrowDown' || ev.key === 'ArrowLeft'){ ev.preventDefault(); setBpm(state.bpm - big); }
+    else if(ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); openBpmPad(); }
+  });
+}
+
+/* ---------------- type a tempo ---------------- */
+let entry = '';
+
+export function openBpmPad(){
+  entry = '';
+  $('bpmSheet').hidden = false;
+  paintPad();
+  document.addEventListener('keydown', padKeys, true);
+}
+function closeBpmPad(){
+  $('bpmSheet').hidden = true;
+  document.removeEventListener('keydown', padKeys, true);
+  $('dial').focus({ preventScroll:true });
+}
+function padValue(){ return entry === '' ? NaN : parseInt(entry, 10); }
+
+function paintPad(){
+  const v = padValue();
+  const valid = Number.isFinite(v) && v >= 20 && v <= 400;
+  const read = $('bpmEntry');
+  read.textContent = entry === '' ? String(state.bpm) : entry;
+  read.parentElement.classList.toggle('placeholder', entry === '');
+  $('bpmOk').disabled = !valid;
+  const hint = $('bpmHint');
+  if(entry === ''){
+    hint.textContent = '20 to 400';
+    hint.classList.remove('bad');
+  }else if(!valid){
+    hint.textContent = v > 400 ? '400 is as fast as it goes' : '20 is as slow as it goes';
+    hint.classList.add('bad');
+  }else{
+    hint.textContent = tempoMark(v);
+    hint.classList.remove('bad');
+  }
+}
+
+function padKey(k){
+  if(k === 'del') entry = entry.slice(0, -1);
+  else if(k === 'ok'){ commitPad(); return; }
+  else if(entry.length < 3) entry += k;
+  paintPad();
+}
+function commitPad(){
+  const v = padValue();
+  if(!(v >= 20 && v <= 400)) return;
+  setBpm(v);
+  save();
+  closeBpmPad();
+}
+function padKeys(ev){
+  if($('bpmSheet').hidden) return;
+  if(/^[0-9]$/.test(ev.key)){ ev.preventDefault(); padKey(ev.key); }
+  else if(ev.key === 'Backspace'){ ev.preventDefault(); padKey('del'); }
+  else if(ev.key === 'Enter'){ ev.preventDefault(); commitPad(); }
+  else if(ev.key === 'Escape'){ ev.preventDefault(); closeBpmPad(); }
+  ev.stopPropagation();          // keep Space and the digit shortcuts out of it
+}
+
+function initBpmPad(){
+  $('bpmPad').addEventListener('click', ev => {
+    const b = ev.target.closest('button');
+    if(b) padKey(b.dataset.k);
+  });
+  $('bpmCancel').addEventListener('click', closeBpmPad);
+  $('bpmSheet').addEventListener('click', ev => {
+    if(ev.target === $('bpmSheet')) closeBpmPad();   // tap the backdrop
   });
 }
 
@@ -348,6 +425,7 @@ function tap(){
 /* ---------------- init ---------------- */
 export function initMetronome(){
   initDial();
+  initBpmPad();
   buildSubRow();
   buildSoundRow();
   buildBeatGrid();

@@ -11,7 +11,7 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 ## What's in it
 
 **Metronome**
-- 20–400 BPM: rotary dial, slider, ± buttons, tap tempo
+- 20–400 BPM: turn the dial, or tap it to type a tempo on a keypad; slider, ± buttons, tap tempo
 - Time signatures from 1 to 32 beats, over 1 / 2 / 4 / 8 / 16
 - Three sounding tones per beat — each beat cycles
   **High → Mid → Low → Flash (silent) → Rest**
@@ -58,10 +58,17 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 - Export and import as JSON
 
 **Tuner**
-- Chromatic, autocorrelation pitch detection with octave correction
+- Listens continuously and keeps reading whatever is being played — it does not stop after a note
+- Needle gauge over ±50 cents, with coloured zones and an in-tune lock
+- A real strobe: the bands drift at the beat frequency against the note you are aiming at, so
+  they stand still when you are in tune and the direction tells you which way to go
+- Chromatic, McLeod (NSDF) pitch detection on a decimated signal — accurate to a fraction of a
+  cent, immune to the octave error that catches naive autocorrelation, about 0.3 ms a reading
 - A4 adjustable 415–465 Hz
 - Presets for guitar (standard, drop D, half step down, open G), bass 4 and 5 string,
-  ukulele, violin, cello, mandolin, banjo
+  ukulele, violin, cello, mandolin, banjo; the nearest string lights up as you play
+- The metronome's Start button is not shown here — it only appears on the metronome and setlist
+  tabs, and anywhere the metronome is actually running
 
 **Sound level meter**
 - dB with peak hold, min / average / max and a scrolling graph
@@ -95,6 +102,15 @@ Blink is free. If it earns its place on your music stand, you can
 Everything stays on the device. Settings and setlists go in `localStorage`; the microphone is only
 open while the tuner or the level meter is running, and no audio is recorded, stored or sent anywhere.
 
+## Tests
+
+The pitch detector is pure, so it runs under node against synthesised strings — rich harmonics,
+weak fundamentals, deliberate detuning, alternative A4 references, silence and noise:
+
+```
+node tests/pitch.test.js
+```
+
 ## Running it locally
 
 Any static server will do — ES modules and the service worker need http, not `file://`:
@@ -117,6 +133,7 @@ js/store.js             VERSION, state, persistence, split and tuning tables
 js/audio.js             synth voices + lookahead scheduler
 js/flash.js             the beat flash
 js/mic.js               shared microphone, reference counted
+js/pitch.js             NSDF pitch detection and note maths (pure, tested)
 js/ui-*.js              one module per tab
 sw.js                   offline cache
 ```

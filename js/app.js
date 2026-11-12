@@ -5,7 +5,7 @@ import { engine, resume } from './audio.js';
 import { initFlash } from './flash.js';
 import { initMetronome, refreshMetronome, setBpm, setNum } from './ui-metronome.js';
 import { initSetlist, refreshSetlist } from './ui-setlist.js';
-import { initTuner, stopTuner } from './ui-tuner.js';
+import { initTuner, stopTuner, tunerShown } from './ui-tuner.js';
 import { initLevels, stopLevels } from './ui-levels.js';
 import { $, $$, toast, segment, segmentSet } from './ui.js';
 
@@ -26,12 +26,22 @@ function applyTheme(){
 
 /* ---------- tabs ---------- */
 let currentTab = 'metronome';
+/* Start/Stop drives the metronome, so it only belongs on the tabs that are
+   about the metronome — on the tuner it just looked like the tuner's own
+   start. It still appears anywhere while the metronome is running, so you
+   are never stuck without a way to stop it. */
+const TRANSPORT_TABS = ['metronome', 'setlist'];
+function paintTransport(){
+  $('playBtn').hidden = !(TRANSPORT_TABS.indexOf(currentTab) >= 0 || engine.running);
+}
+
 function showTab(name){
   currentTab = name;
   $$('.view').forEach(v => { v.hidden = v.dataset.view !== name; });
   $$('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
-  if(name !== 'tuner') stopTuner();
+  if(name !== 'tuner') stopTuner(); else tunerShown();
   if(name !== 'levels') stopLevels();
+  paintTransport();
   document.querySelector('.shell').scrollTop = 0;
 }
 
@@ -58,6 +68,7 @@ function paintPlay(){
   const b = $('playBtn');
   b.textContent = engine.running ? 'Stop' : 'Start';
   b.dataset.on = String(engine.running);
+  paintTransport();
 }
 
 /* ---------- init ---------- */
