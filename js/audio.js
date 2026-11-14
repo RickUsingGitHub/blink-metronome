@@ -141,6 +141,28 @@ export function previewSound(soundId, kind, beat){
   });
 }
 
+/* Soft two-note chime when an LTE countdown finishes. */
+export function playChime(){
+  resume().then(() => {
+    const t = audioCtx().currentTime + 0.02;
+    tone(t,        { type:'sine', freq: 880,  dur: 0.24, gain: 0.28 });
+    tone(t + 0.12, { type:'sine', freq: 1318.5, dur: 0.42, gain: 0.30 });
+  });
+}
+
+/* Gentle strummed preview of a chord voicing (array of { hz }). */
+export function playChordPreview(notes){
+  if(!Array.isArray(notes) || !notes.length) return;
+  resume().then(() => {
+    const base = audioCtx().currentTime + 0.02;
+    const g = Math.min(0.22, 0.55 / notes.length);
+    notes.forEach((n, idx) => {
+      if(!n || !(n.hz > 0)) return;
+      tone(base + idx * 0.028, { type:'triangle', freq: n.hz, dur: 0.45, gain: g });
+    });
+  });
+}
+
 /* ---------- transport ---------- */
 let running = false, timer = null, raf = null;
 let queue = [];

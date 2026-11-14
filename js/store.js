@@ -1,6 +1,6 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.4.0';
+export const VERSION = '1.5.0';
 export const KOFI_URL = 'https://ko-fi.com/rickapps';
 const KEY = 'blink.v1';
 
@@ -140,6 +140,9 @@ function defaults(){
     rampOn:false, rampBy:2, rampEvery:4, rampTo:160,
     theme:null, wake:true, quarterBpm:false,
     a4:440, tuning:'guitar', lvCal:0,
+    lteMode:'target', lteDuration:60, ltePreset:'A-D',
+    lteChords:['A','D'], lteFollowOrder:true, lteChangesOnly:false, lteSens:5,
+    lteHistory:[],
     lists:[{ id:'L1', name:'My setlist', auto:false, bars:8, songs:[] }],
     listIdx:0, songIdx:null,
     stats:{ day:today(), today:0, total:0 }
@@ -231,6 +234,27 @@ export function load(){
   state.a4    = int(o.a4, 415, 465, 440);
   state.tuning= TUNINGS.some(t => t.id === o.tuning) ? o.tuning : 'guitar';
   state.lvCal = int(o.lvCal, -20, 40, 0);
+
+  state.lteMode        = o.lteMode === 'guess' ? 'guess' : 'target';
+  state.lteDuration    = int(o.lteDuration, 0, 600, 60);
+  state.ltePreset      = typeof o.ltePreset === 'string' ? o.ltePreset.slice(0, 32) : 'A-D';
+  state.lteChords      = Array.isArray(o.lteChords) && o.lteChords.length
+                       ? o.lteChords.filter(x => typeof x === 'string').slice(0, 12)
+                       : ['A', 'D'];
+  state.lteFollowOrder = o.lteFollowOrder !== false;
+  state.lteChangesOnly = !!o.lteChangesOnly;
+  state.lteSens        = int(o.lteSens, 1, 10, 5);
+  state.lteHistory     = Array.isArray(o.lteHistory)
+                       ? o.lteHistory.slice(0, 20).filter(h => h && typeof h === 'object').map(h => ({
+                           at: typeof h.at === 'string' ? h.at.slice(0, 32) : '',
+                           mode: h.mode === 'guess' ? 'guess' : 'target',
+                           duration: int(h.duration, 0, 600, 60),
+                           count: int(h.count, 0, 9999, 0),
+                           avgAcc: int(h.avgAcc, 0, 100, 0),
+                           cleanCount: int(h.cleanCount, 0, 9999, 0),
+                           chords: Array.isArray(h.chords) ? h.chords.filter(x => typeof x === 'string').slice(0, 12) : []
+                         }))
+                       : [];
 
   if(Array.isArray(o.lists) && o.lists.length){
     state.lists = o.lists.map((l, i) => ({

@@ -82,7 +82,9 @@ button,input,select{font-family:inherit}
 
 /* ---------- dial ---------- */
 .stage{display:flex;flex-direction:column;align-items:center;gap:9px;padding:4px 0 2px}
-.dial{position:relative;width:min(58vw,208px);aspect-ratio:1;border-radius:50%;
+.dial-stage-row{display:flex;align-items:center;justify-content:center;gap:clamp(10px,3vw,18px);width:100%}
+.dial-side{display:flex;flex-direction:column;gap:10px;align-items:center;flex:0 0 auto}
+.dial{position:relative;width:min(52vw,208px);aspect-ratio:1;border-radius:50%;
   background:radial-gradient(circle at 50% 40%,var(--panel-2),var(--panel) 72%);
   border:2px solid var(--line);display:grid;place-items:center;touch-action:none;cursor:ns-resize;user-select:none}
 .dial-glow{position:absolute;inset:-16px;border-radius:50%;opacity:0;background:var(--beat);filter:blur(16px);pointer-events:none;will-change:opacity}
@@ -115,9 +117,13 @@ button,input,select{font-family:inherit}
 .step{width:40px;height:40px;flex:0 0 auto;border-radius:11px;border:1px solid var(--line);
   background:var(--panel-2);color:var(--fg);font-size:1.25rem;line-height:1;cursor:pointer}
 .step.sm{width:32px;height:32px;font-size:1.05rem;border-radius:9px}
+.step.dial-step{width:clamp(54px,14vw,68px);height:clamp(54px,14vw,68px);border-radius:15px;
+  font-size:1.85rem;font-weight:600;display:grid;place-items:center}
 .step:active{background:var(--panel-3)}
 .tapbtn{border:1px solid var(--line);background:var(--panel-2);color:var(--fg);font-weight:600;font-size:.84rem;
   border-radius:11px;padding:0 15px;height:40px;cursor:pointer;flex:0 0 auto}
+.tapbtn.dial-tap{width:clamp(58px,15vw,74px);height:clamp(88px,23vw,116px);border-radius:15px;
+  padding:0;font-size:.96rem;letter-spacing:.05em;text-transform:uppercase;display:grid;place-items:center}
 .tapbtn:active{border-color:var(--accent);color:var(--accent)}
 .mini{border:1px solid var(--line);background:var(--panel-2);color:var(--fg);font-size:.75rem;font-weight:600;
   border-radius:9px;padding:7px 10px;cursor:pointer;white-space:nowrap}
@@ -357,16 +363,86 @@ details.acc[open] .sum-val{display:none}
   text-decoration:none;font-weight:700;font-size:.86rem;border-radius:11px;padding:11px 16px}
 .kofi-btn:hover{filter:brightness(1.06)}
 
+/* ---------- LTE chord counter ---------- */
+.lte-stage{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:15px 13px;
+  display:flex;flex-direction:column;gap:12px;transition:border-color .15s}
+.lte-stage.flash-hit{border-color:var(--mute);box-shadow:0 0 0 1px var(--mute)}
+.lte-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.lte-kpi{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:8px 6px}
+.lte-kpi span{display:block;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.lte-kpi b{display:block;font-family:var(--font-display);font-size:1.55rem;line-height:1.1;margin-top:2px;
+  font-variant-numeric:tabular-nums}
+.lte-timebar{height:5px;border-radius:999px;background:var(--panel-2);overflow:hidden}
+.lte-timefill{height:100%;width:100%;background:var(--accent);transition:width .12s linear}
+.lte-readout{text-align:center;padding:4px 0 2px}
+.lte-chord-row{display:flex;align-items:center;justify-content:center;gap:10px;min-height:3.6rem}
+.lte-chord{font-family:var(--font-display);font-size:clamp(3rem,16vw,4.3rem);font-weight:500;line-height:.95}
+.lte-stage.tier-ok .lte-chord{color:var(--mute)}
+.lte-stage.tier-near .lte-chord{color:var(--accent)}
+.lte-stage.tier-far .lte-chord{color:var(--warn)}
+.lte-badge{font-style:normal;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  border-radius:999px;padding:3px 10px;border:1px solid var(--line);color:var(--dim)}
+.lte-badge[data-tier="ok"]{color:var(--mute);border-color:var(--mute)}
+.lte-badge[data-tier="near"]{color:var(--accent);border-color:var(--accent)}
+.lte-badge[data-tier="far"]{color:var(--warn);border-color:var(--warn)}
+.lte-sub{font-size:.8rem;color:var(--dim);margin-top:3px;min-height:1.25em}
+.lte-targets{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.lte-pill{border:1px solid var(--line);background:var(--panel-2);color:var(--dim);border-radius:9px;
+  padding:6px 12px;font-size:.82rem;font-weight:700;cursor:pointer}
+.lte-pill.next{border-color:var(--accent);color:var(--accent);background:var(--panel-3)}
+.lte-guess-pill{font-size:.74rem;color:var(--beat);background:var(--panel-2);border:1px solid var(--line);
+  border-radius:999px;padding:4px 12px}
+.lte-env-wrap{display:flex;flex-direction:column;gap:4px}
+.lte-env-head{display:flex;justify-content:space-between;font-size:.66rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--dim);font-variant-numeric:tabular-nums}
+.lte-env-bar{position:relative;height:10px;border-radius:999px;background:var(--panel-2);
+  border:1px solid var(--line);overflow:hidden}
+.lte-env-fill{height:100%;width:0%;background:linear-gradient(to right,var(--beat),var(--mute) 60%,var(--accent))}
+.lte-env-gate{position:absolute;top:0;bottom:0;width:2px;background:var(--fg);opacity:.65}
+.lte-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.lte-metrics div{background:var(--panel-2);border-radius:9px;padding:6px 4px;font-variant-numeric:tabular-nums}
+.lte-metrics span{display:block;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.lte-metrics b{font-family:var(--font-display);font-size:1rem;color:var(--fg)}
+.lte-chroma{display:grid;grid-template-columns:repeat(12,1fr);gap:3px}
+.lte-pc{text-align:center;font-size:.66rem;font-weight:700;padding:5px 0;border-radius:6px;
+  background:var(--panel-2);color:var(--faint);border:1px solid transparent;font-variant-numeric:tabular-nums}
+.lte-pc.want{border-color:var(--line);color:var(--dim)}
+.lte-pc.on{background:var(--panel-3);color:var(--mute);border-color:var(--mute)}
+.lte-pc.stray{color:var(--warn);border-color:var(--warn)}
+.lte-go{width:100%;height:48px;border-radius:13px;border:0;cursor:pointer;background:var(--accent);color:#1a1405;
+  font-family:var(--font-display);font-size:1.05rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.lte-go[data-on="true"]{background:var(--panel-2);color:var(--warn);border:1px solid #50262a}
+.lte-target-panel{display:flex;flex-direction:column;gap:9px;margin:9px 0}
+.lte-target-panel .row+.row{margin-top:0}
+.lte-sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.lte-sum-grid div{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:8px 4px}
+.lte-sum-grid span{display:block;font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.lte-sum-grid b{font-family:var(--font-display);font-size:1.15rem;color:var(--fg)}
+.lte-sum-grid b[data-tier="ok"]{color:var(--mute)}
+.lte-sum-grid b[data-tier="near"]{color:var(--accent)}
+.lte-sum-grid b[data-tier="far"]{color:var(--warn)}
+.lte-sum-sub{margin-top:8px;font-size:.74rem;color:var(--dim);text-align:center;font-variant-numeric:tabular-nums}
+.lte-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;max-height:36vh;overflow-y:auto}
+.lte-row{display:flex;align-items:center;gap:9px;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:10px;padding:8px 10px}
+.lte-row-idx{font-family:var(--font-display);font-size:.86rem;color:var(--dim);min-width:2.4ch;font-variant-numeric:tabular-nums}
+.lte-row-main{flex:1;min-width:0}
+.lte-row-name{font-size:.9rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lte-row-meta{font-size:.68rem;color:var(--dim);font-variant-numeric:tabular-nums}
+.lte-row-acc{font-family:var(--font-display);font-size:1.05rem;font-variant-numeric:tabular-nums;color:var(--mute)}
+.lte-row[data-tier="near"] .lte-row-acc{color:var(--accent)}
+.lte-row[data-tier="far"] .lte-row-acc{color:var(--warn)}
+
 /* ---------- stage mode ---------- */
 body.stage .panel,body.stage .silentcard,body.stage .session,body.stage .tabs,
-body.stage .readout,body.stage .updatebar{display:none}
+body.stage .readout,body.stage .updatebar,body.stage .dial-side{display:none}
 body.stage .dial{width:min(76vw,330px)}
 body.stage .shell{display:flex;align-items:center}
 body.stage .view{justify-content:center;flex:1}
 
 @media (prefers-reduced-motion:reduce){
   /* only the decorative easing — the beat flash is the instrument and always runs */
-  .switch::after,.meter-fill,.meter-peak,.needle-pin,.toast{transition:none}
+  .switch::after,.meter-fill,.meter-peak,.needle-pin,.toast,.lte-timefill,.lte-stage{transition:none}
   details.acc summary::after{transition:none}
 }
 

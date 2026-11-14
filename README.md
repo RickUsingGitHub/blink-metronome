@@ -11,7 +11,7 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 ## What's in it
 
 **Metronome**
-- 20–500 BPM: turn the dial, or tap it to type a tempo on a keypad; slider, ± buttons, tap tempo
+- 20–500 BPM: turn the dial, or tap it to type a tempo on a keypad; large ± buttons beside the dial, tap tempo
 - Time signatures from 1 to 32 beats, over 1 / 2 / 4 / 8 / 16
 - Three sounding tones per beat — each beat cycles
   **High → Mid → Low → Flash (silent) → Rest**
@@ -70,6 +70,12 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 - The metronome's Start button is not shown here — it only appears on the metronome and setlist
   tabs, and anywhere the metronome is actually running
 
+**Licking Them Envelopes (LTE — Chord counter)**
+- Countdown timer (30s, 1m default, 2m, 3m, 5m, custom ±15s, or open-ended ∞)
+- Two modes: tell it which chords you're playing (presets or custom list, in order or any order) or let Blink auto-detect across 120 chord shapes
+- Tracks each strum attack envelope and rates accuracy across purity, fullness, and tuning
+- Live 12-note chroma strip, envelope threshold meter, session summary, and chord-by-chord log
+
 **Sound level meter**
 - dB with peak hold, min / average / max and a scrolling graph
 - Calibration offset, because a phone mic is not a measurement instrument
@@ -109,6 +115,7 @@ weak fundamentals, deliberate detuning, alternative A4 references, silence and n
 
 ```
 node tests/pitch.test.js
+node tests/chord.test.js
 ```
 
 ## Running it locally
@@ -127,13 +134,14 @@ The version lives in one place, `VERSION` at the top of `js/store.js`; the servi
 cache name in `sw.js` is bumped with it.
 
 ```
-index.html              markup for all five tabs
+index.html              markup for all six tabs
 css/app.css             tokens and layout, three themes
 js/store.js             VERSION, state, persistence, split and tuning tables
 js/audio.js             synth voices + lookahead scheduler
 js/flash.js             the beat flash
 js/mic.js               shared microphone, reference counted
 js/pitch.js             NSDF pitch detection and note maths (pure, tested)
+js/chord.js             polyphonic chroma, chord accuracy rating, envelope tracker (pure, tested)
 js/ui-*.js              one module per tab
 sw.js                   offline cache
 ```

@@ -46,15 +46,24 @@
 
     <!-- dial -->
     <div class="stage" id="stageArea">
-      <div class="dial" id="dial" role="slider" title="Turn to change the tempo, tap to type one"
-           aria-label="Tempo — turn to change, tap to type a value"
-           aria-valuemin="20" aria-valuemax="500" aria-valuenow="120" tabindex="0">
-        <div class="dial-glow" id="dialGlow"></div>
-        <svg class="dial-ticks" viewBox="0 0 200 200" aria-hidden="true"><g id="dialTicks"></g></svg>
-        <div class="dial-face">
-          <div class="bpm" id="bpmNum">120</div>
-          <div class="bpm-unit">BPM</div>
-          <div class="tempomark" id="tempoMark">Allegro</div>
+      <div class="dial-stage-row">
+        <div class="dial-side dial-steps">
+          <button class="step dial-step" id="bpmPlus" type="button" aria-label="Faster">+</button>
+          <button class="step dial-step" id="bpmMinus" type="button" aria-label="Slower">−</button>
+        </div>
+        <div class="dial" id="dial" role="slider" title="Turn to change the tempo, tap to type one"
+             aria-label="Tempo — turn to change, tap to type a value"
+             aria-valuemin="20" aria-valuemax="500" aria-valuenow="120" tabindex="0">
+          <div class="dial-glow" id="dialGlow"></div>
+          <svg class="dial-ticks" viewBox="0 0 200 200" aria-hidden="true"><g id="dialTicks"></g></svg>
+          <div class="dial-face">
+            <div class="bpm" id="bpmNum">120</div>
+            <div class="bpm-unit">BPM</div>
+            <div class="tempomark" id="tempoMark">Allegro</div>
+          </div>
+        </div>
+        <div class="dial-side dial-tap-col">
+          <button class="tapbtn dial-tap" id="tapBtn" type="button">Tap</button>
         </div>
       </div>
       <div class="readout">
@@ -67,14 +76,8 @@
       </div>
     </div>
 
-    <!-- tempo row -->
+    <!-- signature & split -->
     <div class="panel">
-      <div class="row">
-        <button class="step" id="bpmMinus" type="button" aria-label="Slower">−</button>
-        <input type="range" id="bpmRange" min="20" max="500" step="1" value="120" aria-label="Tempo">
-        <button class="step" id="bpmPlus" type="button" aria-label="Faster">+</button>
-        <button class="tapbtn" id="tapBtn" type="button">Tap</button>
-      </div>
       <div class="row wrap">
         <span class="lbl">Signature</span>
         <div class="sigbox">
@@ -334,6 +337,135 @@
     </div>
   </section>
 
+  <!-- ================= LTE: CHORD COUNTER ================= -->
+  <section class="view" id="view-lte" data-view="lte" hidden>
+    <header class="topbar">
+      <div class="brand">Licking Them Envelopes <span>LTE</span></div>
+      <div class="grow"></div>
+      <button class="chip-btn" id="lteMicBtn" type="button">Listen</button>
+    </header>
+
+    <div class="lte-stage" id="lteCard">
+      <div class="lte-kpis">
+        <div class="lte-kpi">
+          <span>Time left</span>
+          <b id="lteTimer">1:00</b>
+        </div>
+        <div class="lte-kpi">
+          <span>Chords</span>
+          <b id="lteCount">0</b>
+        </div>
+        <div class="lte-kpi">
+          <span>Avg accuracy</span>
+          <b id="lteAvg">—</b>
+        </div>
+      </div>
+
+      <div class="lte-timebar" aria-hidden="true">
+        <div class="lte-timefill" id="lteTimeFill"></div>
+      </div>
+
+      <div class="lte-readout">
+        <div class="lte-chord-row">
+          <span class="lte-chord" id="lteChord">—</span>
+          <em class="lte-badge" id="lteVerdict" hidden></em>
+        </div>
+        <div class="lte-sub" id="lteChordSub">Tap Start below to count &amp; rate your chords</div>
+      </div>
+
+      <div class="lte-targets" id="lteTargetBar"></div>
+
+      <div class="lte-env-wrap">
+        <div class="lte-env-head">
+          <span>Envelope</span>
+          <span id="lteAccText">—</span>
+        </div>
+        <div class="lte-env-bar">
+          <div class="lte-env-fill" id="lteEnvFill"></div>
+          <div class="lte-env-gate" id="lteEnvGate"></div>
+        </div>
+      </div>
+
+      <div class="lte-metrics">
+        <div><span>Purity</span><b id="ltePurity">—</b></div>
+        <div><span>Fullness</span><b id="lteFull">—</b></div>
+        <div><span>Tuning</span><b id="lteTune">—</b></div>
+      </div>
+
+      <div class="lte-chroma" id="lteChroma" aria-label="Active chord notes"></div>
+
+      <button class="lte-go" id="lteStartBtn" type="button" data-on="false">Start 1:00 session</button>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <span class="lbl">Chords</span>
+        <div class="seg" id="lteModeSeg" role="group" aria-label="Chord selection mode">
+          <button type="button" data-ltemode="target" aria-pressed="true">I'll tell you</button>
+          <button type="button" data-ltemode="guess">You guess</button>
+        </div>
+      </div>
+
+      <div id="lteTargetPanel" class="lte-target-panel">
+        <div class="row">
+          <span class="lbl">Drill</span>
+          <select id="ltePreset" class="select" aria-label="Chord drill preset"></select>
+        </div>
+        <div class="row">
+          <span class="lbl">Custom</span>
+          <input class="text" id="lteChordInput" type="text" placeholder="e.g. A, D or C G Am F" aria-label="Chords to play">
+          <button class="mini" id="lteChordApply" type="button">Set</button>
+        </div>
+        <div class="row wrap">
+          <label class="check"><input type="checkbox" id="lteOrderChk" checked> <span>Follow order</span></label>
+          <label class="check"><input type="checkbox" id="lteChangesChk"> <span>Count changes only</span></label>
+        </div>
+        <p class="hint">Tap any chord pill above to hear a reference strum or set it as next.</p>
+      </div>
+
+      <div class="row wrap">
+        <span class="lbl">Timer</span>
+        <div class="seg" id="lteDurSeg" role="group" aria-label="Countdown duration">
+          <button type="button" data-dur="30">30s</button>
+          <button type="button" data-dur="60" aria-pressed="true">1m</button>
+          <button type="button" data-dur="120">2m</button>
+          <button type="button" data-dur="180">3m</button>
+          <button type="button" data-dur="0">∞</button>
+        </div>
+        <div class="sigbox">
+          <button class="step sm" id="lteDurMinus" type="button" aria-label="15 seconds less">−</button>
+          <button class="step sm" id="lteDurPlus" type="button" aria-label="15 seconds more">+</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <span class="lbl">Sensitivity</span>
+        <input type="range" id="lteSensRange" min="1" max="10" step="1" value="5" aria-label="Strum detection sensitivity">
+        <span class="val sm" id="lteSensVal">5</span>
+      </div>
+    </div>
+
+    <div class="panel" id="lteSummaryPanel" hidden>
+      <div class="panel-head">
+        <span class="lbl">Session result</span>
+        <div class="grow"></div>
+        <span class="note" id="ltePace"></span>
+      </div>
+      <div class="lte-summary" id="lteSummary"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="lbl">Chord log</span>
+        <div class="grow"></div>
+        <span class="note" id="lteBest"></span>
+        <button class="mini" id="lteClear" type="button">Clear</button>
+      </div>
+      <ul class="lte-log" id="lteLog"></ul>
+      <p class="hint" id="lteEmpty">No chords counted yet. Strum cleanly across the strings — Blink tracks every attack envelope and scores purity, fullness, and tuning.</p>
+    </div>
+  </section>
+
   <!-- ================= LEVELS ================= -->
   <section class="view" id="view-levels" data-view="levels" hidden>
     <header class="topbar">
@@ -428,6 +560,7 @@
     <button role="tab" data-tab="metronome" aria-selected="true">Metronome</button>
     <button role="tab" data-tab="setlist" aria-selected="false">Setlist</button>
     <button role="tab" data-tab="tuner" aria-selected="false">Tuner</button>
+    <button role="tab" data-tab="lte" aria-selected="false" title="Licking Them Envelopes — Chord Counter">LTE</button>
     <button role="tab" data-tab="levels" aria-selected="false">Level</button>
     <button role="tab" data-tab="settings" aria-selected="false">More</button>
   </nav>

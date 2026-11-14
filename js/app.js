@@ -6,6 +6,7 @@ import { initFlash } from './flash.js';
 import { initMetronome, refreshMetronome, setBpm, setNum } from './ui-metronome.js';
 import { initSetlist, refreshSetlist } from './ui-setlist.js';
 import { initTuner, stopTuner, tunerShown } from './ui-tuner.js';
+import { initLte, stopLte, refreshLte } from './ui-lte.js';
 import { initLevels, stopLevels } from './ui-levels.js';
 import { $, $$, toast, segment, segmentSet } from './ui.js';
 
@@ -40,6 +41,7 @@ function showTab(name){
   $$('.view').forEach(v => { v.hidden = v.dataset.view !== name; });
   $$('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
   if(name !== 'tuner') stopTuner(); else tunerShown();
+  if(name !== 'lte') stopLte();
   if(name !== 'levels') stopLevels();
   paintTransport();
   document.querySelector('.shell').scrollTop = 0;
@@ -78,6 +80,7 @@ function init(){
   initMetronome();
   initSetlist();
   initTuner();
+  initLte();
   initLevels();
 
   $('playBtn').addEventListener('click', () => engine.toggle());
@@ -128,6 +131,7 @@ function init(){
     applyTheme();
     refreshMetronome();
     refreshSetlist();
+    refreshLte();
     toast('Cleared');
   });
   $('verTag').textContent = 'v' + VERSION;

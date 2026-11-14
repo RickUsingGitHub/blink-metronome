@@ -16,7 +16,6 @@ function queueSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 400)
 export function setBpm(v, quiet){
   state.bpm = clamp(Math.round(v), BPM_MIN, BPM_MAX);
   $('bpmNum').textContent = state.bpm;
-  $('bpmRange').value = state.bpm;
   $('tempoMark').textContent = tempoMark(state.bpm);
   $('dial').setAttribute('aria-valuenow', state.bpm);
   paintTicks();
@@ -447,7 +446,6 @@ export function initMetronome(){
   buildBeatGrid();
 
   /* tempo */
-  $('bpmRange').addEventListener('input', e => setBpm(+e.target.value));
   repeat($('bpmMinus'), () => setBpm(state.bpm - 1));
   repeat($('bpmPlus'),  () => setBpm(state.bpm + 1));
   $('tapBtn').addEventListener('click', tap);
