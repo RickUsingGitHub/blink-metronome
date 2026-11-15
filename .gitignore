@@ -1,0 +1,15 @@
+# Secrets & local environment
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependencies & test artifacts
+node_modules/
+test-results/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
