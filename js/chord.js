@@ -636,12 +636,15 @@ export function accuracyVerdict(acc){
    emits a counted chord event with its accuracy rating. */
 export function createEnvelopeTracker(opts){
   const o = opts || {};
-  const cooldownMs   = o.cooldownMs === undefined ? 240 : o.cooldownMs;
+  const cooldownMs   = o.cooldownMs === undefined ? 280 : o.cooldownMs;
   const settleFrames = o.settleFrames === undefined ? 2 : o.settleFrames;
   const gate         = o.gate === undefined ? 0.005 : o.gate;
 
   let env = 0;
+  let minEnv = 0;
+  let prevRms = 0;
   let armed = true;
+  let quietFrames = 0;
   let collecting = false;
   let framesLeft = 0;
   let accumChroma = new Float32Array(12);
@@ -656,7 +659,10 @@ export function createEnvelopeTracker(opts){
 
   function reset(){
     env = 0;
+    minEnv = 0;
+    prevRms = 0;
     armed = true;
+    quietFrames = 0;
     collecting = false;
     framesLeft = 0;
     accumChroma.fill(0);
@@ -676,16 +682,26 @@ export function createEnvelopeTracker(opts){
     const info = extractChroma(input, sampleRate, { a4: so.a4 || 440, gate });
     const rms = info.rms;
 
-    const prevEnv = env;
     /* Fast attack, slower release envelope follower. */
-    env = rms > env ? env * 0.25 + rms * 0.75 : env * 0.82 + rms * 0.18;
+    env = rms > env ? env * 0.25 + rms * 0.75 : env * 0.85 + rms * 0.15;
 
-    if(rms < gate * 1.15){
-      armed = true;
-      stableChord = null;
-      stableFrames = 0;
-    }else if(env < peakRms * 0.52){
-      armed = true;
+    /* Hysteresis re-arming: only re-arm after sustained silence below the
+       noise gate, never mid-sustain during normal piano/guitar decay. */
+    if(rms < gate){
+      if(!armed && !collecting) minEnv = Math.min(minEnv, rms);
+      quietFrames++;
+      if(quietFrames >= 4 && env < gate * 1.15){
+        armed = true;
+        minEnv = 0;
+        peakRms = 0;
+        stableChord = null;
+        stableFrames = 0;
+      }
+    }else{
+      quietFrames = 0;
+      if(!armed && !collecting){
+        minEnv = Math.min(minEnv, rms);
+      }
     }
 
     const instant = detectChord(null, sampleRate, {
@@ -699,11 +715,23 @@ export function createEnvelopeTracker(opts){
     }else if(instant.chord){
       stableChord = instant.chord;
       stableFrames = 1;
+    }else{
+      stableChord = null;
+      stableFrames = 0;
     }
 
     const sinceAttack = nowMs - lastAttackAt;
-    const attackJump = rms >= gate * 1.35 && (armed || rms > prevEnv * 1.48);
-    const legatChange = !armed && instant.chord && instant.chord !== lastCountedChord && stableFrames >= 2;
+    const restrike = !armed && rms >= gate * 1.8 && rms > prevRms * 1.18 && rms > minEnv * 1.90;
+    const attackJump = (armed && rms >= gate * 1.8) || restrike;
+
+    const lastObj = lastCountedChord ? getChord(lastCountedChord) : null;
+    const decayPowerArtifact = !!(lastObj && instant.type === '5' && lastObj.rootName === instant.rootName);
+    const legatChange = !armed && !decayPowerArtifact && instant.chord &&
+                        instant.chord !== lastCountedChord &&
+                        stableFrames >= 5 && instant.confidence >= 0.62 &&
+                        rms >= Math.max(gate * 2.4, peakRms * 0.35);
+
+    prevRms = rms;
 
     if(!collecting && sinceAttack >= cooldownMs && (attackJump || legatChange) && info.clarity > 0){
       collecting = true;
@@ -715,6 +743,7 @@ export function createEnvelopeTracker(opts){
       accumClarity = info.clarity;
       accumBass = info.bassPc;
       peakRms = rms;
+      minEnv = rms;
       armed = false;
     }else if(collecting){
       if(info.clarity > 0){
@@ -731,6 +760,7 @@ export function createEnvelopeTracker(opts){
     let countedEvent = null;
     if(collecting && framesLeft <= 0){
       collecting = false;
+      minEnv = Math.max(rms, peakRms * 0.75);
       const avgChroma = new Float32Array(12);
       let maxC = 0;
       for(let i = 0; i < 12; i++){

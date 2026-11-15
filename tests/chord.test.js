@@ -135,6 +135,40 @@ console.log('\nEnvelope & strum tracker ("Licking Them Envelopes")');
   assert('counted all 4 strums', counted.length === 4, 'got ' + counted.length);
   assert('identified A -> D -> A -> D', counted.map(c => c.chord).join(',') === 'A,D,A,D',
     'got ' + counted.map(c => c.chord).join(','));
+
+  /* Sustained 4-second decaying piano C chord with ±18% string-beating shimmer
+     must count exactly 1 chord, never 3 or 4 phantom counts during decay. */
+  const susTracker = createEnvelopeTracker({ cooldownMs: 280, settleFrames: 3, gate: 0.006 });
+  const susCounted = [];
+  let st = 0;
+  for(let f = 0; f < 120; f++){
+    const sec = f * 0.033;
+    const decay = Math.exp(-sec * 1.15);
+    const shimmer = 1 + 0.18 * Math.sin(sec * 11.0);
+    const amp = 0.28 * decay * shimmer;
+    const buf = synthChord('C', { ampScale: amp, noise: 0.002 });
+    const out = susTracker.step(buf, SR, st, {});
+    if(out.counted) susCounted.push(out.counted);
+    st += 33;
+  }
+  assert('1 sustained C chord counts once', susCounted.length === 1 && susCounted[0].chord === 'C',
+    'got ' + susCounted.length + ' (' + susCounted.map(x => x.chord).join(',') + ')');
+
+  /* Repeated strums of the same C chord with partial decay (not full silence) */
+  const repTracker = createEnvelopeTracker({ cooldownMs: 280, settleFrames: 3, gate: 0.006 });
+  const repCounted = [];
+  let rt = 0;
+  for(let strum = 0; strum < 3; strum++){
+    for(let f = 0; f < 18; f++){
+      const amp = 0.26 * Math.exp(-(f * 0.033) * 2.8);
+      const buf = synthChord('C', { ampScale: amp, noise: 0.002 });
+      const out = repTracker.step(buf, SR, rt, { expected: 'C', targets: ['C'] });
+      if(out.counted) repCounted.push(out.counted);
+      rt += 33;
+    }
+  }
+  assert('3 repeated C strums count 3 times', repCounted.length === 3,
+    'got ' + repCounted.length);
 }
 
 console.log('\nSilence and white noise must report no chord');

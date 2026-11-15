@@ -35,8 +35,8 @@ function gateFromSens(sens){
 
 function makeTracker(){
   tracker = createEnvelopeTracker({
-    cooldownMs: 220,
-    settleFrames: 2,
+    cooldownMs: 280,
+    settleFrames: 3,
     gate: gateFromSens(state.lteSens)
   });
 }
@@ -174,7 +174,7 @@ function paintControls(){
   $('lteSensVal').textContent = state.lteSens;
   $('lteChordInput').value = state.lteChords.join(', ');
 
-  const gatePct = clamp((gateFromSens(state.lteSens) / 0.06) * 100, 3, 92);
+  const gatePct = clamp(((gateFromSens(state.lteSens) * 1.8) / 0.06) * 100, 3, 92);
   $('lteEnvGate').style.left = gatePct.toFixed(1) + '%';
 }
 

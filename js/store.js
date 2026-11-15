@@ -1,6 +1,6 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.5.0';
+export const VERSION = '1.5.1';
 export const KOFI_URL = 'https://ko-fi.com/rickapps';
 const KEY = 'blink.v1';
 
