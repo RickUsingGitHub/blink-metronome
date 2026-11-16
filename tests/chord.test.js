@@ -169,6 +169,55 @@ console.log('\nEnvelope & strum tracker ("Licking Them Envelopes")');
   }
   assert('3 repeated C strums count 3 times', repCounted.length === 3,
     'got ' + repCounted.length);
+
+  /* Guitar G7 with rolled bass-to-treble onset & strong B2 3rd harmonic (F#4)
+     + B3 3rd harmonic (F#5) must count once as G7 without Bm/Gmaj7 double-split. */
+  const SR_G = 48000, WIN_G = 4096;
+  function makeRolledStrum(notesHz, durSec, onsetSpreadSec, boostThirds){
+    const len = Math.floor(SR_G * durSec);
+    const out = new Float32Array(len);
+    notesHz.forEach((hz, idx) => {
+      const startSample = Math.floor(idx * onsetSpreadSec * SR_G);
+      const isLowB = hz < 130;
+      const w1 = isLowB ? 0.12 : 1.0;
+      const w2 = isLowB ? 0.90 : 0.70;
+      const w3 = boostThirds && (Math.abs(hz - 123.47) < 2 || Math.abs(hz - 246.94) < 2) ? 0.85 : 0.45;
+      for(let i = startSample; i < len; i++){
+        const t = (i - startSample) / SR_G;
+        const env = Math.min(1, t / 0.012) * Math.exp(-t * 1.4);
+        out[i] += 0.16 * env * (
+          w1 * Math.sin(2 * Math.PI * hz * t) +
+          w2 * Math.sin(2 * Math.PI * hz * 2 * t) +
+          w3 * Math.sin(2 * Math.PI * hz * 3 * t) +
+          0.25 * Math.sin(2 * Math.PI * hz * 4 * t)
+        );
+      }
+    });
+    return out;
+  }
+  const g7Seq = [
+    makeRolledStrum([98.00, 123.47, 146.83, 196.00, 246.94, 349.23], 1.5, 0.018, true),
+    makeRolledStrum([130.81, 164.81, 196.00, 261.63, 329.63], 1.5, 0.014, false),
+    makeRolledStrum([98.00, 123.47, 146.83, 196.00, 246.94, 349.23], 1.5, 0.018, true),
+    makeRolledStrum([130.81, 164.81, 196.00, 261.63, 329.63], 1.5, 0.014, false)
+  ];
+  const g7Tr = createEnvelopeTracker({ cooldownMs: 280, settleFrames: 3, gate: 0.008 });
+  const g7Counted = [];
+  let g7Now = 0;
+  for(let si = 0; si < g7Seq.length; si++){
+    const seg = g7Seq[si];
+    for(let off = 0; off + WIN_G <= seg.length; off += Math.floor(SR_G * 0.033)){
+      const r = g7Tr.step(seg.subarray(off, off + WIN_G), SR_G, g7Now, {
+        targets: ['G7', 'C'], expected: si % 2 === 0 ? 'G7' : 'C'
+      });
+      if(r.counted) g7Counted.push(r.counted.chord);
+      g7Now += 33;
+    }
+    g7Now += 250;
+  }
+  assert('rolled guitar G7 <-> C (with B2/B3 3rd harmonics) counts 4 cleanly',
+    g7Counted.length === 4 && g7Counted.join(',') === 'G7,C,G7,C',
+    'got ' + g7Counted.length + ' (' + g7Counted.join(',') + ')');
 }
 
 console.log('\nSilence and white noise must report no chord');

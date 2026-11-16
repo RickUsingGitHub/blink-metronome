@@ -343,11 +343,15 @@ export function extractChroma(input, sampleRate, opts){
 
     /* If an adjacent semitone is booming in a short 85 ms window, f0 can sit
        on its skirt without a strict local peak; accept it only when BOTH h=2
-       and h=3 form strict local peaks at the harmonic frequencies. */
+       and h=3 still form strict local peaks after lower-note harmonic subtraction
+       so upper harmonics of bass/mid chord tones don't fabricate a neighbor note. */
     if(p1.amp === 0 && p2.amp > noiseFloor * 1.4 && p3.amp > noiseFloor * 1.4){
+      const p2s = peakAround(specWork, f0 * 2, 38);
+      const p3s = peakAround(specWork, f0 * 3, 36);
       const kNearest = Math.round(f0 / binHz);
-      if(kNearest >= minBin && kNearest <= maxBin && specWork[kNearest] > noiseFloor * 1.4){
-        p1 = { amp: specWork[kNearest], cents: p2.cents, k: kNearest };
+      if(p2s.amp > noiseFloor * 1.4 && p3s.amp > noiseFloor * 1.4 &&
+         kNearest >= minBin && kNearest <= maxBin && specWork[kNearest] > noiseFloor * 1.4){
+        p1 = { amp: specWork[kNearest], cents: p2s.cents, k: kNearest };
       }
     }
 
@@ -359,7 +363,10 @@ export function extractChroma(input, sampleRate, opts){
     if(a1 <= 0 || (a2 + a3 + a4h) <= noiseFloor) continue;
     if((a1 + 0.8 * a3) < (a2 + 0.8 * a4h) * 0.16) continue;
 
-    const effFund = Math.max(a1, Math.min(a1 * 4.5, a2 * 1.65));
+    /* Missing-fundamental boost belongs below D#3 (m < 50) where small mics roll
+       off bass fundamentals; at G3+ avoid inflating weak bleed off lower 3rds. */
+    const boostCap = m < 50 ? 4.5 : (m < 55 ? 2.2 : 1.35);
+    const effFund = Math.max(a1, Math.min(a1 * boostCap, a2 * 1.65));
     const sal = Math.sqrt(effFund * (effFund + 0.85 * a2 + 0.60 * a3 + 0.35 * a4h));
     if(sal < noiseFloor * 1.8) continue;
 
@@ -369,7 +376,9 @@ export function extractChroma(input, sampleRate, opts){
     else noteCents[m] = p1.cents;
 
     /* Subtract expected harmonics of this fundamental from specWork so phantom
-       octaves (h=2), twelfths (h=3) and 17ths (h=5) aren't scored as roots. */
+       octaves (h=2), twelfths (h=3) and 17ths (h=5) aren't scored as roots.
+       Only subtract shoulder bins within ±38 cents so a harmonic does not
+       erase an adjacent semitone fundamental at low FFT bin density. */
     for(let h = 2; h <= 6; h++){
       const hHz = f0 * h;
       if(hHz >= 3200) break;
@@ -379,7 +388,9 @@ export function extractChroma(input, sampleRate, opts){
         for(let dk = -1; dk <= 1; dk++){
           const kk = hp.k + dk;
           if(kk >= minBin && kk <= maxBin){
-            specWork[kk] = Math.max(0, specWork[kk] - expected);
+            if(dk === 0 || Math.abs(1200 * Math.log2((kk * binHz) / hHz)) <= 38){
+              specWork[kk] = Math.max(0, specWork[kk] - expected);
+            }
           }
         }
       }
@@ -647,8 +658,9 @@ export function createEnvelopeTracker(opts){
   let quietFrames = 0;
   let collecting = false;
   let framesLeft = 0;
+  let collectFrames = 0;
   let accumChroma = new Float32Array(12);
-  let accumCount = 0;
+  let accumWeight = 0;
   let accumCents = 0;
   let accumClarity = 0;
   let accumBass = -1;
@@ -665,8 +677,9 @@ export function createEnvelopeTracker(opts){
     quietFrames = 0;
     collecting = false;
     framesLeft = 0;
+    collectFrames = 0;
     accumChroma.fill(0);
-    accumCount = 0;
+    accumWeight = 0;
     accumCents = 0;
     accumClarity = 0;
     accumBass = -1;
@@ -726,34 +739,46 @@ export function createEnvelopeTracker(opts){
 
     const lastObj = lastCountedChord ? getChord(lastCountedChord) : null;
     const decayPowerArtifact = !!(lastObj && instant.type === '5' && lastObj.rootName === instant.rootName);
+    const legatoCooldown = Math.max(cooldownMs * 2.2, 620);
     const legatChange = !armed && !decayPowerArtifact && instant.chord &&
                         instant.chord !== lastCountedChord &&
-                        stableFrames >= 5 && instant.confidence >= 0.62 &&
+                        sinceAttack >= legatoCooldown &&
+                        stableFrames >= 6 && instant.confidence >= 0.62 &&
                         rms >= Math.max(gate * 2.4, peakRms * 0.35);
 
     prevRms = rms;
 
+    const frameW = Math.max(1e-12, Math.pow(rms * 100, 4));
     if(!collecting && sinceAttack >= cooldownMs && (attackJump || legatChange) && info.clarity > 0){
       collecting = true;
       lastAttackAt = nowMs;
       framesLeft = settleFrames;
-      accumChroma.set(info.chroma);
-      accumCount = 1;
-      accumCents = info.avgAbsCents;
+      collectFrames = 1;
+      for(let i = 0; i < 12; i++) accumChroma[i] = info.chroma[i] * frameW;
+      accumWeight = frameW;
+      accumCents = info.avgAbsCents * frameW;
       accumClarity = info.clarity;
       accumBass = info.bassPc;
       peakRms = rms;
       minEnv = rms;
       armed = false;
     }else if(collecting){
+      collectFrames++;
       if(info.clarity > 0){
-        for(let i = 0; i < 12; i++) accumChroma[i] += info.chroma[i];
-        accumCount++;
-        accumCents += info.avgAbsCents;
+        for(let i = 0; i < 12; i++) accumChroma[i] += info.chroma[i] * frameW;
+        accumWeight += frameW;
+        accumCents += info.avgAbsCents * frameW;
         accumClarity = Math.max(accumClarity, info.clarity);
-        if(accumBass < 0 && info.bassPc >= 0) accumBass = info.bassPc;
+        if(info.bassPc >= 0 && (accumBass < 0 || rms > peakRms * 1.25)) accumBass = info.bassPc;
       }
-      if(rms > peakRms) peakRms = rms;
+      /* If strum energy is still rising sharply across strings, wait past the
+         ramp crest (bounded) so transient pick noise does not skew the chord. */
+      if(rms > peakRms * 1.15){
+        peakRms = rms;
+        if(collectFrames < settleFrames + 4 && framesLeft < 2) framesLeft = 2;
+      }else if(rms > peakRms){
+        peakRms = rms;
+      }
       framesLeft--;
     }
 
@@ -762,9 +787,10 @@ export function createEnvelopeTracker(opts){
       collecting = false;
       minEnv = Math.max(rms, peakRms * 0.75);
       const avgChroma = new Float32Array(12);
+      const invW = 1 / Math.max(1e-8, accumWeight);
       let maxC = 0;
       for(let i = 0; i < 12; i++){
-        avgChroma[i] = accumChroma[i] / Math.max(1, accumCount);
+        avgChroma[i] = accumChroma[i] * invW;
         if(avgChroma[i] > maxC) maxC = avgChroma[i];
       }
       if(maxC > 0){
@@ -779,7 +805,7 @@ export function createEnvelopeTracker(opts){
           rms: peakRms,
           clarity: accumClarity,
           bassPc: accumBass,
-          avgAbsCents: accumCents / Math.max(1, accumCount),
+          avgAbsCents: accumCents * invW,
           activePcs
         },
         targets: so.targets,
