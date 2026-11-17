@@ -8,7 +8,7 @@ import { initSetlist, refreshSetlist } from './ui-setlist.js';
 import { initTuner, stopTuner, tunerShown } from './ui-tuner.js';
 import { initLte, stopLte, refreshLte } from './ui-lte.js';
 import { initLevels, stopLevels } from './ui-levels.js';
-import { $, $$, toast, segment, segmentSet } from './ui.js';
+import { $, $$, toast, segment, segmentSet, initTooltips } from './ui.js';
 
 load();
 
@@ -82,6 +82,7 @@ function init(){
   initTuner();
   initLte();
   initLevels();
+  initTooltips();
 
   $('playBtn').addEventListener('click', () => engine.toggle());
   bus.on('start', () => { paintPlay(); keepAwake(); });

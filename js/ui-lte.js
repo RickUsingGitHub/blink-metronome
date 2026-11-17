@@ -14,6 +14,7 @@ import { $, $$, toast, segment, segmentSet } from './ui.js';
 
 const FFT = 4096;
 const HOLD_MS = 1600;
+const COUNT_HOLD_MS = 1100;
 
 let analyser = null, buf = null, timer = null, raf = null;
 let micOn = false;
@@ -21,6 +22,7 @@ let sessionActive = false;
 let sessionStartMs = 0;
 let lastReadAt = 0;
 let lastCountDisplayAt = 0;
+let lastCountedChord = null;
 let liveEnv = 0;
 let liveChroma = new Float32Array(12);
 let liveExpected = null;
@@ -65,17 +67,18 @@ function buildChromaStrip(){
   });
 }
 
-function paintChromaStrip(chroma, chordNotes){
+function paintChromaStrip(chroma, chordNotes, allowStray){
   const box = $('lteChroma');
   if(!box) return;
   const noteSet = new Set(Array.isArray(chordNotes) ? chordNotes : []);
+  const showStray = allowStray !== false;
   Array.from(box.children).forEach((el, pc) => {
     const v = chroma ? chroma[pc] : 0;
     const active = v >= 0.22;
     const expected = noteSet.has(NOTE_NAMES[pc]);
     el.classList.toggle('on', active);
     el.classList.toggle('want', expected);
-    el.classList.toggle('stray', active && noteSet.size > 0 && !expected);
+    el.classList.toggle('stray', showStray && active && noteSet.size > 0 && !expected);
     el.style.setProperty('--v', v.toFixed(2));
   });
 }
@@ -189,8 +192,8 @@ function clearReadout(){
   $('ltePurity').textContent = '—';
   $('lteFull').textContent = '—';
   $('lteTune').textContent = '—';
-  $('lteCard').classList.remove('tier-ok', 'tier-near', 'tier-far');
-  paintChromaStrip(null, null);
+  $('lteCard').classList.remove('tier-ok', 'tier-near', 'tier-far', 'tier-preview');
+  paintChromaStrip(null, null, true);
 }
 
 function showDetection(res, isCounted){
@@ -198,17 +201,28 @@ function showDetection(res, isCounted){
   const verdict = accuracyVerdict(res.accuracy);
   $('lteChord').textContent = res.chord || '—';
 
+  const wrongTarget = !!(res.expected && !res.matchedTarget);
+  const rawTier = wrongTarget ? 'far' : verdict.tier;
+  /* Never flash alarming red on uncounted interim decay/transition frames during
+     a timed session; reserve red tier-far for actual counted hits in the log. */
+  const softPreview = sessionActive && !isCounted && rawTier === 'far';
+  const displayTier = softPreview ? 'preview' : rawTier;
+
   const badge = $('lteVerdict');
   badge.hidden = !res.chord;
-  badge.textContent = res.expected && !res.matchedTarget
-    ? 'Target ' + res.expected
-    : verdict.short;
-  badge.dataset.tier = (res.expected && !res.matchedTarget) ? 'far' : verdict.tier;
+  badge.textContent = softPreview
+    ? (res.expected ? 'Next ' + res.expected : 'Listening')
+    : (wrongTarget ? 'Target ' + res.expected : verdict.short);
+  badge.dataset.tier = displayTier;
 
-  card.classList.remove('tier-ok', 'tier-near', 'tier-far');
-  card.classList.add('tier-' + ((res.expected && !res.matchedTarget) ? 'far' : verdict.tier));
+  card.classList.remove('tier-ok', 'tier-near', 'tier-far', 'tier-preview');
+  card.classList.add('tier-' + displayTier);
 
-  if(res.expected && !res.matchedTarget){
+  if(softPreview){
+    $('lteChordSub').textContent = res.expected
+      ? 'Next: ' + res.expected + ' · hearing ' + res.label
+      : res.label + ' · listening…';
+  }else if(wrongTarget){
     $('lteChordSub').textContent =
       'Expected ' + res.expected + ' — heard ' + res.label + ' (' + res.accuracy + '% match)';
   }else{
@@ -220,12 +234,12 @@ function showDetection(res, isCounted){
   $('lteFull').textContent = res.completeness + '%';
   $('lteTune').textContent = res.tuning + '%';
 
-  const displayNotes = res.expected && !res.matchedTarget
+  const displayNotes = wrongTarget
     ? (chordVoicing(res.expected, state.a4).map(x => x.note.replace(/\d+$/, '')))
     : res.notes;
   liveExpected = displayNotes;
   liveChroma = res.chroma || liveChroma;
-  paintChromaStrip(res.chroma, displayNotes);
+  paintChromaStrip(res.chroma, displayNotes, !softPreview);
 
   if(isCounted){
     card.classList.add('flash-hit');
@@ -365,6 +379,7 @@ function sample(){
       });
       lastReadAt = now;
       lastCountDisplayAt = now;
+      lastCountedChord = ev.chord;
       showDetection(ev, true);
       updateSessionCounters();
       renderLog();
@@ -376,9 +391,20 @@ function sample(){
         }
       }
     }else if(stepOut.live && stepOut.live.chord){
-      lastReadAt = now;
-      if(!sessionActive || now - lastCountDisplayAt > 280){
-        showDetection(stepOut.live, false);
+      const liveGate = gateFromSens(state.lteSens) * 1.25;
+      const liveStrong = stepOut.live.rms >= liveGate && stepOut.live.confidence >= 0.62;
+      if(liveStrong){
+        lastReadAt = now;
+        const heldCounted = sessionActive && lastCountDisplayAt && (now - lastCountDisplayAt <= COUNT_HOLD_MS);
+        const stalePrevious = sessionActive && lastCountedChord &&
+          stepOut.live.chord === lastCountedChord &&
+          stepOut.live.expected && !stepOut.live.matchedTarget;
+        if(!heldCounted && !stalePrevious){
+          showDetection(stepOut.live, false);
+        }
+      }else if(lastReadAt && now - lastReadAt > HOLD_MS){
+        lastReadAt = 0;
+        clearReadout();
       }
     }else if(lastReadAt && now - lastReadAt > HOLD_MS){
       lastReadAt = 0;
@@ -436,6 +462,8 @@ function stopMic(){
   release(analyser);
   analyser = null;
   liveEnv = 0;
+  lastCountDisplayAt = 0;
+  lastCountedChord = null;
   $('lteEnvFill').style.width = '0%';
   paintControls();
   clearReadout();
@@ -450,6 +478,8 @@ async function startSession(){
   sessionLog = [];
   targetIdx = 0;
   lastReadAt = 0;
+  lastCountDisplayAt = 0;
+  lastCountedChord = null;
   sessionStartMs = performance.now();
   sessionActive = true;
 
