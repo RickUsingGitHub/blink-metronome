@@ -157,7 +157,11 @@ export function parseChordList(str){
     .map(c => c.id);
 }
 
-export function chordVoicing(idOrName, a4 = 440){
+export function chordVoicing(idOrName, a4 = 440, customFrets = null){
+  if(Array.isArray(customFrets) && customFrets.length === 6){
+    const custom = fretsToVoicing(customFrets, a4);
+    if(custom.length) return custom;
+  }
   const c = getChord(idOrName);
   if(!c) return [];
   const preset = GUITAR_VOICINGS[c.id];
@@ -175,6 +179,236 @@ export function chordVoicing(idOrName, a4 = 440){
     const name = NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
     return { note: name, hz: a4 * Math.pow(2, (midi - 69) / 12) };
   });
+}
+
+/* ---------- 6-string guitar chord tabs & custom voicings ---------- */
+export const STANDARD_STRINGS = [
+  { string:6, label:'E', note:'E2', midi:40 },
+  { string:5, label:'A', note:'A2', midi:45 },
+  { string:4, label:'D', note:'D3', midi:50 },
+  { string:3, label:'G', note:'G3', midi:55 },
+  { string:2, label:'B', note:'B3', midi:59 },
+  { string:1, label:'e', note:'E4', midi:64 }
+];
+
+export const CHORD_TAB_PRESETS = {
+  'C': [
+    { name:'Open',       frets:[-1, 3, 2, 0, 1, 0] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 0, 1, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 2, 0, 1, 0] },
+    { name:'Full /G',    frets:[3, 3, 2, 0, 1, 0] }
+  ],
+  'Cm': [
+    { name:'Barre 3rd',  frets:[-1, 3, 5, 5, 4, 3] },
+    { name:'Easy 4-str', frets:[-1, -1, 5, 5, 4, 3] },
+    { name:'Open',       frets:[-1, 3, 1, 0, 1, 3] }
+  ],
+  'C7': [
+    { name:'Open',       frets:[-1, 3, 2, 3, 1, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 2, 3, 1, 0] }
+  ],
+  'Cmaj7': [
+    { name:'Open',       frets:[-1, 3, 2, 0, 0, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 2, 0, 0, 0] }
+  ],
+  'D': [
+    { name:'Open',       frets:[-1, -1, 0, 2, 3, 2] },
+    { name:'Open /A',    frets:[-1, 0, 0, 2, 3, 2] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 2, 3, 2] }
+  ],
+  'Dm': [
+    { name:'Open',       frets:[-1, -1, 0, 2, 3, 1] },
+    { name:'Open /A',    frets:[-1, 0, 0, 2, 3, 1] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 2, 3, 1] }
+  ],
+  'D7': [
+    { name:'Open',       frets:[-1, -1, 0, 2, 1, 2] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 2, 1, 2] }
+  ],
+  'Dm7': [
+    { name:'Open',       frets:[-1, -1, 0, 2, 1, 1] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 2, 1, 1] }
+  ],
+  'Dsus4': [
+    { name:'Open',       frets:[-1, -1, 0, 2, 3, 3] }
+  ],
+  'Dsus2': [
+    { name:'Open',       frets:[-1, -1, 0, 2, 3, 0] }
+  ],
+  'E': [
+    { name:'Open',       frets:[0, 2, 2, 1, 0, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 2, 1, 0, 0] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 1, 0, 0] }
+  ],
+  'Em': [
+    { name:'Open',       frets:[0, 2, 2, 0, 0, 0] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 0, 0, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 2, 0, 0, 0] }
+  ],
+  'E7': [
+    { name:'Open 2-fgr', frets:[0, 2, 0, 1, 0, 0] },
+    { name:'Open 4-fgr', frets:[0, 2, 2, 1, 3, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 0, 1, 0, 0] }
+  ],
+  'Em7': [
+    { name:'Open 1-fgr', frets:[0, 2, 0, 0, 0, 0] },
+    { name:'Open 4-fgr', frets:[0, 2, 2, 0, 3, 0] }
+  ],
+  'F': [
+    { name:'Easy 4-str', frets:[-1, -1, 3, 2, 1, 1] },
+    { name:'Full barre', frets:[1, 3, 3, 2, 1, 1] },
+    { name:'5-str',      frets:[-1, 3, 3, 2, 1, 1] },
+    { name:'Open Fmaj7', frets:[-1, -1, 3, 2, 1, 0] }
+  ],
+  'Fm': [
+    { name:'Easy 4-str', frets:[-1, -1, 3, 1, 1, 1] },
+    { name:'Full barre', frets:[1, 3, 3, 1, 1, 1] }
+  ],
+  'Fmaj7': [
+    { name:'Open',       frets:[-1, -1, 3, 2, 1, 0] },
+    { name:'5-str',      frets:[-1, 3, 3, 2, 1, 0] }
+  ],
+  'G': [
+    { name:'Open',       frets:[3, 2, 0, 0, 0, 3] },
+    { name:'4-finger',   frets:[3, 2, 0, 0, 3, 3] },
+    { name:'Easy 4-str', frets:[-1, -1, 0, 0, 0, 3] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 0, 0, 3] }
+  ],
+  'Gm': [
+    { name:'Barre 3rd',  frets:[3, 5, 5, 3, 3, 3] },
+    { name:'Easy 4-str', frets:[-1, -1, 0, 3, 3, 3] }
+  ],
+  'G7': [
+    { name:'Open 6-str', frets:[3, 2, 0, 0, 0, 1] },
+    { name:'Easy 4-str', frets:[-1, -1, 0, 0, 0, 1] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 0, 0, 1] },
+    { name:'Open 5-str', frets:[3, -1, 0, 0, 0, 1] },
+    { name:'Barre 3rd',  frets:[3, 5, 3, 4, 3, 3] }
+  ],
+  'Gmaj7': [
+    { name:'Open 6-str', frets:[3, 2, 0, 0, 0, 2] },
+    { name:'Easy 4-str', frets:[-1, -1, 0, 0, 0, 2] }
+  ],
+  'A': [
+    { name:'Open',       frets:[-1, 0, 2, 2, 2, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 2, 2, 2, 0] }
+  ],
+  'Am': [
+    { name:'Open',       frets:[-1, 0, 2, 2, 1, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 2, 2, 1, 0] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 2, 1, 0] }
+  ],
+  'A7': [
+    { name:'Open 2-fgr', frets:[-1, 0, 2, 0, 2, 0] },
+    { name:'Open 4-fgr', frets:[-1, 0, 2, 2, 2, 3] }
+  ],
+  'Am7': [
+    { name:'Open 2-fgr', frets:[-1, 0, 2, 0, 1, 0] },
+    { name:'Easy 4-str', frets:[-1, -1, 2, 0, 1, 0] }
+  ],
+  'Asus2': [
+    { name:'Open',       frets:[-1, 0, 2, 2, 0, 0] }
+  ],
+  'Asus4': [
+    { name:'Open',       frets:[-1, 0, 2, 2, 3, 0] }
+  ],
+  'B': [
+    { name:'Barre 2nd',  frets:[-1, 2, 4, 4, 4, 2] },
+    { name:'Easy 4-str', frets:[-1, -1, 4, 4, 4, 2] }
+  ],
+  'Bm': [
+    { name:'Barre 2nd',  frets:[-1, 2, 4, 4, 3, 2] },
+    { name:'Easy 4-str', frets:[-1, -1, 4, 4, 3, 2] },
+    { name:'Easy 3-str', frets:[-1, -1, -1, 4, 3, 2] }
+  ],
+  'B7': [
+    { name:'Open',       frets:[-1, 2, 1, 2, 0, 2] },
+    { name:'Easy 4-str', frets:[-1, -1, 1, 2, 0, 2] }
+  ]
+};
+
+export function getChordTabs(idOrName){
+  const c = getChord(idOrName);
+  if(!c) return [{ name:'Open', frets:[-1, 0, 2, 2, 2, 0] }];
+  if(CHORD_TAB_PRESETS[c.id]) return CHORD_TAB_PRESETS[c.id];
+
+  /* Fallback movable shapes for any of the 120 chords in the dictionary. */
+  const eFret = (c.root - 4 + 12) % 12;
+  const aFret = (c.root - 9 + 12) % 12;
+  const isMin = c.type === 'm' || c.type === 'm7' || c.type === 'dim';
+  const is7   = c.type === '7' || c.type === 'm7';
+  const isMaj7 = c.type === 'maj7';
+  const is5   = c.type === '5';
+
+  const eShape = is5
+    ? [eFret, eFret + 2, eFret + 2, -1, -1, -1]
+    : [
+        eFret,
+        eFret + 2,
+        eFret + (is7 ? 0 : (isMaj7 ? 1 : 2)),
+        eFret + (isMin ? 0 : 1),
+        eFret,
+        eFret
+      ];
+  const aShape = is5
+    ? [-1, aFret, aFret + 2, aFret + 2, -1, -1]
+    : [
+        -1,
+        aFret,
+        aFret + 2,
+        aFret + (is7 ? 0 : (isMaj7 ? 1 : 2)),
+        aFret + (isMin ? 1 : 2),
+        aFret
+      ];
+  const easy4 = [-1, -1, eShape[2], eShape[3], eShape[4], eShape[5]];
+  return [
+    { name:'Barre E',    frets:eShape },
+    { name:'Barre A',    frets:aShape },
+    { name:'Easy 4-str', frets:easy4 }
+  ];
+}
+
+export function fretsToVoicing(frets, a4 = 440){
+  if(!Array.isArray(frets) || frets.length !== 6) return [];
+  const out = [];
+  for(let i = 0; i < 6; i++){
+    const f = frets[i];
+    if(f === null || f === undefined || f < 0) continue;
+    const midi = STANDARD_STRINGS[i].midi + f;
+    const pc = ((midi % 12) + 12) % 12;
+    const noteClass = NOTE_NAMES[pc];
+    const note = noteClass + (Math.floor(midi / 12) - 1);
+    const hz = a4 * Math.pow(2, (midi - 69) / 12);
+    out.push({ string:6 - i, fret:f, midi, pc, noteClass, note, hz });
+  }
+  return out;
+}
+
+export function buildCustomChord(idOrName, frets){
+  const base = getChord(idOrName);
+  if(!base || !Array.isArray(frets) || frets.length !== 6) return base;
+  const voiced = fretsToVoicing(frets, 440);
+  if(!voiced.length) return base;
+
+  const pcs = [];
+  for(const v of voiced){
+    if(!pcs.includes(v.pc)) pcs.push(v.pc);
+  }
+  if(!pcs.length) return base;
+
+  const mask = new Float32Array(12);
+  pcs.forEach((pc, idx) => {
+    mask[pc] = idx === 0 ? 1.15 : (pc === base.root ? 1.12 : 1.0);
+  });
+  const notes = pcs.map(pc => NOTE_NAMES[pc]);
+  return {
+    ...base,
+    root: voiced[0].pc,
+    pitchClasses: pcs,
+    corePcs: pcs,
+    notes,
+    mask
+  };
 }
 
 /* ---------- FFT (in-place Radix-2) ---------- */
@@ -537,15 +771,28 @@ export function detectChord(input, sampleRate, opts){
     Array.isArray(o.targets) ? o.targets.map(t => (getChord(t) || {}).id).filter(Boolean) : []
   );
   const expectedChord = o.expected ? getChord(o.expected) : null;
+  const customTabs = (o.customTabs && typeof o.customTabs === 'object') ? o.customTabs : null;
+
+  const evalCandidate = cand => {
+    const baseM = rateChordAccuracy(cand, info);
+    if(customTabs && Array.isArray(customTabs[cand.id])){
+      const customCand = buildCustomChord(cand.id, customTabs[cand.id]);
+      const customM = rateChordAccuracy(customCand, info);
+      if(customM.score > baseM.score || (customM.score >= baseM.score - 0.04 && customM.accuracy > baseM.accuracy)){
+        return { cand: customCand, m: customM };
+      }
+    }
+    return { cand, m: baseM };
+  };
 
   let best = null, bestMetrics = null, bestScore = -Infinity, secondScore = -Infinity;
 
-  for(const cand of ALL_CHORDS){
+  for(const rawCand of ALL_CHORDS){
     /* In open guess mode, require at least 2 active pitch classes so a single
        plucked string isn't called a full triad; power chords need 2, triads 2+. */
     if(info.activePcs < 2) continue;
 
-    const m = rateChordAccuracy(cand, info);
+    const { cand, m } = evalCandidate(rawCand);
     let s = m.score;
     if(targetSet.has(cand.id)) s += 0.06;
     if(expectedChord && cand.id === expectedChord.id) s += 0.04;
@@ -592,7 +839,7 @@ export function detectChord(input, sampleRate, opts){
   if(expectedChord){
     matchedTarget = best.id === expectedChord.id;
     if(!matchedTarget){
-      const expMetrics = rateChordAccuracy(expectedChord, info);
+      const expMetrics = evalCandidate(expectedChord).m;
       finalMetrics = {
         ...expMetrics,
         accuracy: Math.min(expMetrics.accuracy, Math.round(expMetrics.accuracy * 0.72))
@@ -603,7 +850,7 @@ export function detectChord(input, sampleRate, opts){
     if(!matchedTarget){
       let bestTargetMetrics = { accuracy: 0, purity: 0, completeness: 0, tuning: 0 };
       for(const tid of targetSet){
-        const tm = rateChordAccuracy(tid, info);
+        const tm = evalCandidate(getChord(tid)).m;
         if(tm.accuracy > bestTargetMetrics.accuracy) bestTargetMetrics = tm;
       }
       finalMetrics = {
@@ -720,7 +967,8 @@ export function createEnvelopeTracker(opts){
     const instant = detectChord(null, sampleRate, {
       chromaInfo: info,
       targets: so.targets,
-      expected: so.expected
+      expected: so.expected,
+      customTabs: so.customTabs
     });
 
     if(instant.chord && instant.chord === stableChord){
@@ -809,7 +1057,8 @@ export function createEnvelopeTracker(opts){
           activePcs
         },
         targets: so.targets,
-        expected: so.expected
+        expected: so.expected,
+        customTabs: so.customTabs
       });
 
       if(settled.chord){

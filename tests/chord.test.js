@@ -5,6 +5,7 @@
 import {
   detectChord, extractChroma, rateChordAccuracy,
   parseChordName, parseChordList, chordVoicing,
+  getChordTabs, fretsToVoicing,
   createEnvelopeTracker, CHORD_PRESETS
 } from '../js/chord.js';
 import { hzFromName } from '../js/pitch.js';
@@ -218,6 +219,32 @@ console.log('\nEnvelope & strum tracker ("Licking Them Envelopes")');
   assert('rolled guitar G7 <-> C (with B2/B3 3rd harmonics) counts 4 cleanly',
     g7Counted.length === 4 && g7Counted.join(',') === 'G7,C,G7,C',
     'got ' + g7Counted.length + ' (' + g7Counted.join(',') + ')');
+
+  /* Custom guitar tab shapes: 3-string easy G7 (xxx001) & user-customized fret */
+  const g7Tabs = getChordTabs('G7');
+  assert('G7 has multiple preset guitar tab shapes', g7Tabs.length >= 4, 'got ' + g7Tabs.length);
+  const easy3Frets = [-1, -1, -1, 0, 0, 1];
+  const easy3Notes = fretsToVoicing(easy3Frets, 440).map(v => v.note);
+  const easy3Wave = synthChord(easy3Notes);
+  const easy3Res = detectChord(easy3Wave, SR, {
+    targets: ['G7', 'C'],
+    expected: 'G7',
+    customTabs: { 'G7': easy3Frets }
+  });
+  assert('custom 3-string G7 tab (xxx001) matches G7 at >=90% accuracy',
+    easy3Res.chord === 'G7' && easy3Res.matchedTarget && easy3Res.accuracy >= 90,
+    'got ' + easy3Res.chord + ' acc=' + easy3Res.accuracy);
+
+  const customFretG7 = [3, 2, 0, 0, 0, 2]; // user modified 1st string to fret 2
+  const customWave = synthChord(fretsToVoicing(customFretG7, 440).map(v => v.note));
+  const customRes = detectChord(customWave, SR, {
+    targets: ['G7', 'C'],
+    expected: 'G7',
+    customTabs: { 'G7': customFretG7 }
+  });
+  assert('user-adjusted G7 tab matches G7 when customTabs provided',
+    customRes.chord === 'G7' && customRes.matchedTarget && customRes.accuracy >= 90,
+    'got ' + customRes.chord + ' acc=' + customRes.accuracy);
 }
 
 console.log('\nSilence and white noise must report no chord');

@@ -1,6 +1,6 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.5.3';
+export const VERSION = '1.5.4';
 export const KOFI_URL = 'https://ko-fi.com/rickapps';
 const KEY = 'blink.v1';
 
@@ -142,6 +142,7 @@ function defaults(){
     a4:440, tuning:'guitar', lvCal:0,
     lteMode:'target', lteDuration:60, ltePreset:'A-D',
     lteChords:['A','D'], lteFollowOrder:true, lteChangesOnly:false, lteSens:5,
+    lteShowDetails:false, lteTabShapes:{},
     lteHistory:[],
     lists:[{ id:'L1', name:'My setlist', auto:false, bars:8, songs:[] }],
     listIdx:0, songIdx:null,
@@ -244,6 +245,15 @@ export function load(){
   state.lteFollowOrder = o.lteFollowOrder !== false;
   state.lteChangesOnly = !!o.lteChangesOnly;
   state.lteSens        = int(o.lteSens, 1, 10, 5);
+  state.lteShowDetails = !!o.lteShowDetails;
+  state.lteTabShapes   = {};
+  if(o.lteTabShapes && typeof o.lteTabShapes === 'object'){
+    for(const [k, v] of Object.entries(o.lteTabShapes)){
+      if(typeof k === 'string' && Array.isArray(v) && v.length === 6){
+        state.lteTabShapes[k.slice(0, 12)] = v.map(f => int(f, -1, 15, -1));
+      }
+    }
+  }
   state.lteHistory     = Array.isArray(o.lteHistory)
                        ? o.lteHistory.slice(0, 20).filter(h => h && typeof h === 'object').map(h => ({
                            at: typeof h.at === 'string' ? h.at.slice(0, 32) : '',

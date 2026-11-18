@@ -4,8 +4,8 @@
 
 import { state, save, clamp, fmtTime } from './store.js';
 import {
-  CHORD_PRESETS, parseChordList, chordVoicing,
-  accuracyVerdict, createEnvelopeTracker
+  CHORD_PRESETS, STANDARD_STRINGS, parseChordList, chordVoicing,
+  getChordTabs, accuracyVerdict, createEnvelopeTracker
 } from './chord.js';
 import { NOTE_NAMES } from './pitch.js';
 import { acquire, release, micError } from './mic.js';
@@ -52,6 +52,147 @@ function currentExpected(){
   if(state.lteChords.length === 1) return state.lteChords[0];
   if(!state.lteFollowOrder) return null;
   return state.lteChords[targetIdx % state.lteChords.length];
+}
+
+function activeFretsFor(chordId){
+  const saved = state.lteTabShapes && state.lteTabShapes[chordId];
+  if(Array.isArray(saved) && saved.length === 6) return saved.slice();
+  const tabs = getChordTabs(chordId);
+  return tabs[0].frets.slice();
+}
+
+function sameFrets(a, b){
+  if(!Array.isArray(a) || !Array.isArray(b) || a.length !== 6 || b.length !== 6) return false;
+  for(let i = 0; i < 6; i++) if(a[i] !== b[i]) return false;
+  return true;
+}
+
+function renderTabDeck(){
+  const deck = $('lteTabDeck');
+  if(!deck) return;
+  deck.textContent = '';
+
+  if(state.lteMode !== 'target' || !state.lteChords.length){
+    deck.hidden = true;
+    return;
+  }
+
+  const exp = currentExpected();
+  state.lteChords.forEach((ch, idx) => {
+    const presets = getChordTabs(ch);
+    const frets = activeFretsFor(ch);
+    const matchIdx = presets.findIndex(p => sameFrets(p.frets, frets));
+    const shapeLabel = matchIdx >= 0 ? presets[matchIdx].name : 'Custom';
+
+    let maxFret = 0, minPos = 99;
+    for(const f of frets){
+      if(f > maxFret) maxFret = f;
+      if(f > 0 && f < minPos) minPos = f;
+    }
+    const baseFret = maxFret <= 4 ? 1 : Math.max(1, minPos);
+
+    const card = document.createElement('div');
+    card.className = 'lte-tab-card';
+    card.dataset.chord = ch;
+    const isNext = exp ? idx === (targetIdx % state.lteChords.length) : false;
+    card.classList.toggle('is-next', isNext);
+
+    const head = document.createElement('div');
+    head.className = 'lte-tab-head';
+
+    const nameBtn = document.createElement('button');
+    nameBtn.type = 'button';
+    nameBtn.className = 'lte-tab-name';
+    nameBtn.dataset.tip = 'Tap to hear ' + ch + ' (' + frets.map(f => f < 0 ? 'x' : f).join('') + ')';
+    nameBtn.innerHTML = ch + ' <small>🔊</small>';
+    nameBtn.addEventListener('click', () => {
+      targetIdx = idx;
+      renderTargets();
+      playChordPreview(chordVoicing(ch, state.a4, activeFretsFor(ch)));
+    });
+
+    const shapeBtn = document.createElement('button');
+    shapeBtn.type = 'button';
+    shapeBtn.className = 'lte-tab-shape';
+    shapeBtn.textContent = shapeLabel + ' ↻';
+    shapeBtn.dataset.tip = 'Cycle guitar shapes for ' + ch + ' (or tap any string/fret below to customize).';
+    shapeBtn.addEventListener('click', () => {
+      const nextIdx = (matchIdx + 1) % presets.length;
+      const nextFrets = presets[nextIdx].frets.slice();
+      state.lteTabShapes[ch] = nextFrets;
+      save();
+      renderTabDeck();
+      playChordPreview(chordVoicing(ch, state.a4, nextFrets));
+    });
+
+    head.appendChild(nameBtn);
+    head.appendChild(shapeBtn);
+    card.appendChild(head);
+
+    const board = document.createElement('div');
+    board.className = 'lte-tab-board';
+
+    for(let s = 0; s < 6; s++){
+      const f = frets[s];
+      const strInfo = STANDARD_STRINGS[s];
+      const col = document.createElement('div');
+      col.className = 'lte-tab-col';
+
+      const topBtn = document.createElement('button');
+      topBtn.type = 'button';
+      topBtn.className = 'lte-tab-topcell ' + (f < 0 ? 'is-mute' : f === 0 ? 'is-open' : 'is-fret');
+      topBtn.textContent = f < 0 ? 'x' : String(f);
+      topBtn.dataset.tip = 'String ' + strInfo.string + ' (' + strInfo.label + '): tap to toggle open (0) or muted (x).';
+      topBtn.addEventListener('click', () => {
+        const next = frets.slice();
+        next[s] = f < 0 ? 0 : -1;
+        state.lteTabShapes[ch] = next;
+        save();
+        renderTabDeck();
+        playChordPreview(chordVoicing(ch, state.a4, next));
+      });
+      col.appendChild(topBtn);
+
+      const nut = document.createElement('div');
+      nut.className = 'lte-tab-nut';
+      col.appendChild(nut);
+
+      for(let r = 0; r < 4; r++){
+        const fretNum = baseFret + r;
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'lte-tab-fretcell';
+        cell.dataset.fret = String(fretNum);
+        cell.dataset.string = String(strInfo.string);
+        if(f === fretNum){
+          const dot = document.createElement('span');
+          dot.className = 'lte-tab-dot';
+          dot.textContent = String(fretNum);
+          cell.appendChild(dot);
+        }
+        cell.addEventListener('click', () => {
+          const next = frets.slice();
+          next[s] = f === fretNum ? 0 : fretNum;
+          state.lteTabShapes[ch] = next;
+          save();
+          renderTabDeck();
+          playChordPreview(chordVoicing(ch, state.a4, next));
+        });
+        col.appendChild(cell);
+      }
+
+      const foot = document.createElement('div');
+      foot.className = 'lte-tab-foot';
+      const noteName = f < 0 ? '—' : NOTE_NAMES[(strInfo.midi + f) % 12];
+      foot.innerHTML = '<b>' + noteName + '</b>' + strInfo.label;
+      col.appendChild(foot);
+
+      board.appendChild(col);
+    }
+
+    card.appendChild(board);
+    deck.appendChild(card);
+  });
 }
 
 /* ---------- chroma strip ---------- */
@@ -126,10 +267,11 @@ function renderTargets(){
     b.addEventListener('click', () => {
       targetIdx = idx;
       renderTargets();
-      if(!sessionActive) playChordPreview(chordVoicing(ch, state.a4));
+      if(!sessionActive) playChordPreview(chordVoicing(ch, state.a4, activeFretsFor(ch)));
     });
     bar.appendChild(b);
   });
+  renderTabDeck();
 }
 
 function syncPresetFromChords(){
@@ -179,15 +321,29 @@ function paintControls(){
 
   const gatePct = clamp(((gateFromSens(state.lteSens) * 1.8) / 0.06) * 100, 3, 92);
   $('lteEnvGate').style.left = gatePct.toFixed(1) + '%';
+
+  const showDet = !!state.lteShowDetails;
+  $('lteDetails').hidden = !showDet;
+  const moreBtn = $('lteDetailsBtn');
+  if(moreBtn){
+    moreBtn.setAttribute('aria-expanded', String(showDet));
+    moreBtn.textContent = showDet ? '▴' : '▾';
+  }
 }
 
 /* ---------- readouts & log ---------- */
 function clearReadout(){
   $('lteChord').textContent = '—';
   $('lteVerdict').hidden = true;
+  const showDeck = !sessionActive && state.lteMode === 'target' && state.lteChords.length > 0;
+  $('lteTabDeck').hidden = !showDeck;
+  $('lteLiveRow').hidden = showDeck;
+  if(showDeck) renderTabDeck();
   $('lteChordSub').textContent = sessionActive
     ? (currentExpected() ? 'Play ' + currentExpected() + '…' : 'Strum a chord…')
-    : micOn ? 'listening… strum a chord' : 'Tap Start below to count & rate your chords';
+    : micOn
+      ? 'listening… strum a chord'
+      : (showDeck ? 'Tap a string/fret to adjust voicings · Tap Start below to count & rate' : 'Tap Start below to count & rate your chords');
   $('lteAccText').textContent = '—';
   $('ltePurity').textContent = '—';
   $('lteFull').textContent = '—';
@@ -199,6 +355,8 @@ function clearReadout(){
 function showDetection(res, isCounted){
   const card = $('lteCard');
   const verdict = accuracyVerdict(res.accuracy);
+  $('lteTabDeck').hidden = true;
+  $('lteLiveRow').hidden = false;
   $('lteChord').textContent = res.chord || '—';
 
   const wrongTarget = !!(res.expected && !res.matchedTarget);
@@ -235,7 +393,7 @@ function showDetection(res, isCounted){
   $('lteTune').textContent = res.tuning + '%';
 
   const displayNotes = wrongTarget
-    ? (chordVoicing(res.expected, state.a4).map(x => x.note.replace(/\d+$/, '')))
+    ? (chordVoicing(res.expected, state.a4, activeFretsFor(res.expected)).map(x => x.note.replace(/\d+$/, '')))
     : res.notes;
   liveExpected = displayNotes;
   liveChroma = res.chroma || liveChroma;
@@ -359,7 +517,8 @@ function sample(){
       a4: state.a4,
       targets,
       expected,
-      changesOnly: state.lteChangesOnly
+      changesOnly: state.lteChangesOnly,
+      customTabs: state.lteTabShapes
     });
 
     liveEnv = stepOut.envelope;
@@ -558,11 +717,18 @@ export function initLte(){
     sessionActive ? finishSession(false) : startSession();
   });
 
+  $('lteDetailsBtn').addEventListener('click', () => {
+    state.lteShowDetails = !state.lteShowDetails;
+    paintControls();
+    save();
+  });
+
   segment($('lteModeSeg'), 'ltemode', v => {
     state.lteMode = v === 'guess' ? 'guess' : 'target';
     targetIdx = 0;
     paintControls();
     renderTargets();
+    clearReadout();
     save();
   });
 
@@ -574,6 +740,7 @@ export function initLte(){
     targetIdx = 0;
     paintControls();
     renderTargets();
+    clearReadout();
     save();
   });
 
@@ -588,6 +755,7 @@ export function initLte(){
     syncPresetFromChords();
     paintControls();
     renderTargets();
+    clearReadout();
     save();
     toast('Target chords: ' + state.lteChords.join(' → '));
   };

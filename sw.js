@@ -1,6 +1,6 @@
 /* Offline shell. Bump CACHE when any file below changes. */
 
-const CACHE = 'blink-v1.5.3';
+const CACHE = 'blink-v1.5.4';
 const FILES = [
   './',
   './index.html',

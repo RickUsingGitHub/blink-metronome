@@ -366,35 +366,41 @@
       </div>
 
       <div class="lte-readout">
-        <div class="lte-chord-row">
+        <div class="lte-chord-row" id="lteLiveRow">
           <span class="lte-chord" id="lteChord">—</span>
           <em class="lte-badge" id="lteVerdict" hidden></em>
         </div>
+        <div class="lte-tab-deck" id="lteTabDeck" aria-label="Chord tabs"></div>
         <div class="lte-sub" id="lteChordSub">Tap Start below to count &amp; rate your chords</div>
       </div>
 
       <div class="lte-targets" id="lteTargetBar"></div>
 
-      <div class="lte-env-wrap">
-        <div class="lte-env-head">
-          <span data-tip="Live input loudness vs. the white threshold marker set by Sensitivity.">Envelope</span>
-          <span id="lteAccText" data-tip="Last scored chord accuracy (%).">—</span>
+      <div class="lte-details" id="lteDetails" hidden>
+        <div class="lte-env-wrap">
+          <div class="lte-env-head">
+            <span data-tip="Live input loudness vs. the white threshold marker set by Sensitivity.">Envelope</span>
+            <span id="lteAccText" data-tip="Last scored chord accuracy (%).">—</span>
+          </div>
+          <div class="lte-env-bar">
+            <div class="lte-env-fill" id="lteEnvFill"></div>
+            <div class="lte-env-gate" id="lteEnvGate"></div>
+          </div>
         </div>
-        <div class="lte-env-bar">
-          <div class="lte-env-fill" id="lteEnvFill"></div>
-          <div class="lte-env-gate" id="lteEnvGate"></div>
+
+        <div class="lte-metrics">
+          <div data-tip="How cleanly the active notes belong to the chord (100% = no extra stray strings ringing)."><span>Purity</span><b id="ltePurity">—</b></div>
+          <div data-tip="How many of the chord's notes were heard clearly together."><span>Fullness</span><b id="lteFull">—</b></div>
+          <div data-tip="How closely your strings match standard pitch (average cents off)."><span>Tuning</span><b id="lteTune">—</b></div>
         </div>
+
+        <div class="lte-chroma" id="lteChroma" aria-label="Active chord notes" data-tip="12-note strip: outlined = chord notes, green = heard in-chord, red = extra note when scored."></div>
       </div>
 
-      <div class="lte-metrics">
-        <div data-tip="How cleanly the active notes belong to the chord (100% = no extra stray strings ringing)."><span>Purity</span><b id="ltePurity">—</b></div>
-        <div data-tip="How many of the chord's notes were heard clearly together."><span>Fullness</span><b id="lteFull">—</b></div>
-        <div data-tip="How closely your strings match standard pitch (average cents off)."><span>Tuning</span><b id="lteTune">—</b></div>
+      <div class="lte-go-row">
+        <button class="lte-go" id="lteStartBtn" type="button" data-on="false" data-tip="Start or stop the timed chord-counting session.">Start 1:00 session</button>
+        <button class="lte-more" id="lteDetailsBtn" type="button" aria-expanded="false" aria-controls="lteDetails" aria-label="Toggle Envelope, metrics and 12-note strip" data-tip="Show or hide Envelope, Purity, Fullness, Tuning, and the 12-note strip.">▾</button>
       </div>
-
-      <div class="lte-chroma" id="lteChroma" aria-label="Active chord notes" data-tip="12-note strip: outlined = chord notes, green = heard in-chord, red = extra note when scored."></div>
-
-      <button class="lte-go" id="lteStartBtn" type="button" data-on="false" data-tip="Start or stop the timed chord-counting session.">Start 1:00 session</button>
     </div>
 
     <div class="panel">
