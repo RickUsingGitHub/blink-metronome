@@ -1,6 +1,6 @@
 /* Offline shell. Bump CACHE when any file below changes. */
 
-const CACHE = 'blink-v1.5.4';
+const CACHE = 'blink-v1.5.5';
 const FILES = [
   './',
   './index.html',
@@ -57,7 +57,8 @@ self.addEventListener('message', ev => {
 self.addEventListener('activate', ev => {
   ev.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      // Other apps share this origin (rickusinggithub.github.io/...): remove only this app's old caches.
+      .then(keys => Promise.all(keys.filter(k => k.startsWith('blink-') && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
       .then(announce)
   );
