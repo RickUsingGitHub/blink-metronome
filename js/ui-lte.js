@@ -3,7 +3,7 @@
    shared reference-counted microphone in mic.js. */
 
 import {
-  state, save, clamp, fmtTime,
+  state, save, clamp, fmtTime, bus,
   sameChords, chordSetLabel, rememberChordSet, forgetChordSet
 } from './store.js';
 import {
@@ -34,7 +34,7 @@ let sessionLog = [];
 let tracker = null;
 let flashTimer = null;
 
-function gateFromSens(sens){
+export function gateFromSens(sens){
   return 0.018 * Math.pow(0.76, clamp(sens, 1, 10) - 1);
 }
 
@@ -57,7 +57,7 @@ function currentExpected(){
   return state.lteChords[targetIdx % state.lteChords.length];
 }
 
-function activeFretsFor(chordId){
+export function activeFretsFor(chordId){
   const saved = state.lteTabShapes && state.lteTabShapes[chordId];
   if(Array.isArray(saved) && saved.length === 6) return saved.slice();
   const tabs = getChordTabs(chordId);
@@ -71,6 +71,7 @@ function sameFrets(a, b){
 }
 
 function renderTabDeck(){
+  bus.emit('lte:chords');          // the chord check follows the same chords and shapes
   const deck = $('lteTabDeck');
   if(!deck) return;
   deck.textContent = '';
@@ -276,6 +277,7 @@ function paintRemove(){
 }
 
 function renderTargets(){
+  bus.emit('lte:chords');
   const bar = $('lteTargetBar');
   if(!bar) return;
   bar.textContent = '';
@@ -626,6 +628,7 @@ function draw(){
 /* ---------- mic & session lifecycle ---------- */
 async function startMic(){
   if(micOn) return true;
+  bus.emit('mic:claim', 'lte');     // the chord check stops listening
   try{
     analyser = await acquire(FFT);
     buf = new Float32Array(analyser.fftSize);
@@ -741,6 +744,9 @@ export function refreshLte(){
 export function initLte(){
   buildChromaStrip();
   makeTracker();
+
+  // the chord check took the mic: stop listening and any session
+  bus.on('mic:claim', who => { if(who !== 'lte') stopLte(); });
 
   $('lteMicBtn').addEventListener('click', () => {
     if(sessionActive){ finishSession(false); return; }

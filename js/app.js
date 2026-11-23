@@ -7,6 +7,7 @@ import { initMetronome, refreshMetronome, setBpm, setNum } from './ui-metronome.
 import { initSetlist, refreshSetlist } from './ui-setlist.js';
 import { initTuner, stopTuner, tunerShown } from './ui-tuner.js';
 import { initLte, stopLte, refreshLte } from './ui-lte.js';
+import { initCheck, stopCheck } from './ui-check.js';
 import { initLevels, stopLevels } from './ui-levels.js';
 import { $, $$, toast, segment, segmentSet, initTooltips } from './ui.js';
 
@@ -41,7 +42,7 @@ function showTab(name){
   $$('.view').forEach(v => { v.hidden = v.dataset.view !== name; });
   $$('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
   if(name !== 'tuner') stopTuner(); else tunerShown();
-  if(name !== 'lte') stopLte();
+  if(name !== 'lte'){ stopLte(); stopCheck(); }
   if(name !== 'levels') stopLevels();
   paintTransport();
   document.querySelector('.shell').scrollTop = 0;
@@ -81,6 +82,7 @@ function init(){
   initSetlist();
   initTuner();
   initLte();
+  initCheck();
   initLevels();
   initTooltips();
 

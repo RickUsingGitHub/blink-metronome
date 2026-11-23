@@ -1,6 +1,6 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.6.0';
+export const VERSION = '1.7.0';
 export const KOFI_URL = 'https://ko-fi.com/rickapps';
 const KEY = 'blink.v1';
 
@@ -145,6 +145,7 @@ function defaults(){
     lteShowDetails:false, lteTabShapes:{},
     lteHistory:[],
     lteSaved:[],              // chord sets you typed in, kept for next practice
+    lteCheckMode:'string', lteCheckOpen:true,   // the chord check panel
     lists:[{ id:'L1', name:'My setlist', auto:false, bars:8, songs:[] }],
     listIdx:0, songIdx:null,
     stats:{ day:today(), today:0, total:0 }
@@ -247,6 +248,8 @@ export function load(){
   state.lteChangesOnly = !!o.lteChangesOnly;
   state.lteSens        = int(o.lteSens, 1, 10, 5);
   state.lteShowDetails = !!o.lteShowDetails;
+  state.lteCheckMode   = o.lteCheckMode === 'strum' ? 'strum' : 'string';
+  state.lteCheckOpen   = o.lteCheckOpen !== false;
   state.lteTabShapes   = {};
   if(o.lteTabShapes && typeof o.lteTabShapes === 'object'){
     for(const [k, v] of Object.entries(o.lteTabShapes)){

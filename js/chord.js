@@ -459,7 +459,13 @@ function fftInPlace(re, im){
   }
 }
 
-/* ---------- polyphonic chroma & pitch analysis ---------- */
+/* ---------- polyphonic chroma & pitch analysis ----------
+   Individual notes are weighed from D2 to G4 (MIDI 38–67). Besides the
+   12-pitch-class chroma, the result carries that per-note detail — `notes`
+   (strength 0..1 per MIDI number) and `noteCents` — which the chord check
+   uses to tell one string from another an octave apart. */
+export const NOTE_LO = 38, NOTE_HI = 67;
+
 export function extractChroma(input, sampleRate, opts){
   ensureBuffers();
   const o = opts || {};
@@ -477,7 +483,9 @@ export function extractChroma(input, sampleRate, opts){
     clarity: 0,
     bassPc: -1,
     avgAbsCents: 0,
-    activePcs: 0
+    activePcs: 0,
+    notes: new Float32Array(NOTE_HI + 1),
+    noteCents: new Float32Array(NOTE_HI + 1)
   });
   if(rms < gate) return empty();
 
@@ -558,7 +566,7 @@ export function extractChroma(input, sampleRate, opts){
   /* Evaluate MIDI notes 38 (D2, 73.4 Hz) through 67 (G4, 392 Hz), subtracting
      confirmed overtones from `specWork` as we climb so upper harmonics of bass
      strings do not create phantom chord thirds, fifths or sevenths. */
-  const MIDI_LO = 38, MIDI_HI = 67;
+  const MIDI_LO = NOTE_LO, MIDI_HI = NOTE_HI;
   const noteSalience = new Float32Array(MIDI_HI + 1);
   const noteCents    = new Float32Array(MIDI_HI + 1);
   const noiseFloor   = Math.max(avgMag * 1.8, maxMag * 0.035);
@@ -677,7 +685,10 @@ export function extractChroma(input, sampleRate, opts){
   const avgAbsCents = totalWeight > 0 ? weightedCents / totalWeight : 0;
   const clarity = Math.min(1, (crest - 4.5) / 14);
 
-  return { chroma, rms, clarity, bassPc, avgAbsCents, activePcs };
+  const notes = new Float32Array(MIDI_HI + 1);
+  for(let m = MIDI_LO; m <= MIDI_HI; m++) notes[m] = noteSalience[m] / maxSal;
+
+  return { chroma, rms, clarity, bassPc, avgAbsCents, activePcs, notes, noteCents };
 }
 
 /* ---------- score any specific chord against an extracted chroma ---------- */

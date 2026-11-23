@@ -21,3 +21,4 @@ jobs:
       - run: node tests/pitch.test.js
       - run: node tests/chord.test.js
       - run: node tests/lte-sets.test.js
+      - run: node tests/check.test.js

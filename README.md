@@ -74,6 +74,19 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 - Countdown timer (30s, 1m default, 2m, 3m, 5m, custom ±15s, or open-ended ∞)
 - Two modes: tell it which chords you're playing (presets or custom list, in order or any order) or let Blink auto-detect across 120 chord shapes
 - Custom chord sets are kept: once you Set them they appear under **My chord sets** in the Drill list for the next practice, and **Remove** beside the list takes one out when you are done with it
+- **Check a chord** before practising, so you can fix the shape before you count:
+  - *String by string* — tap a string on the diagram and pluck it. Exact pitch tells you the fret you
+    actually played ("That is fret 4 — move that finger 2 frets towards the headstock"), when a
+    finger is not holding the string down ("Ringing open"), when something is damping it (the note
+    dies in under half a second), how many cents sharp or flat it is, and when you plucked a
+    neighbouring string. Strings the shape mutes are checked for staying silent. A good string moves
+    you on to the next; a problem keeps you on it until it is fixed.
+  - *Whole strum* — purity, fullness and tuning, plus which strings did not ring, which sounded on
+    the wrong fret or open, and which muted strings rang.
+  - What it will not claim: fret buzz is not judged, because through a phone mic it cannot be told
+    from pick noise. In a strum, a string whose note doubles a lower one (an octave or a harmonic
+    up) cannot always be confirmed, so it says *Can't tell* and points you to String by string
+    rather than guess.
 - Tracks each strum attack envelope and rates accuracy across purity, fullness, and tuning
 - Live 12-note chroma strip, envelope threshold meter, session summary, and chord-by-chord log
 
@@ -117,7 +130,13 @@ weak fundamentals, deliberate detuning, alternative A4 references, silence and n
 ```
 node tests/pitch.test.js
 node tests/chord.test.js
+node tests/lte-sets.test.js
+node tests/check.test.js
 ```
+
+The chord-check tests synthesise plucked strings and strums as sound over time — right notes, wrong
+frets, fingers not pressing, damped strings, detuned strings, muted strings ringing — and run them
+through the same frame-by-frame listeners the app uses on the mic.
 
 ## Running it locally
 

@@ -403,6 +403,45 @@
       </div>
     </div>
 
+    <!-- check a chord before practising: string by string, or the whole strum -->
+    <details class="panel acc lte-check" id="lteCheckPanel">
+      <summary>
+        <span class="lbl" data-tip="Check a chord shape before you practise: find muted strings, wrong frets and out-of-tune notes.">Check a chord</span>
+        <span class="sum-val" id="lteCheckSum">before you practise</span>
+      </summary>
+      <div class="acc-body">
+        <div class="lte-check-chords" id="lteCheckChords" role="group" aria-label="Chord to check"></div>
+
+        <div class="seg" id="lteCheckModeSeg" role="group" aria-label="How to check">
+          <button type="button" data-checkmode="string" aria-pressed="true" data-tip="Pluck one string at a time. Gives the exact note, the fret you actually played, tuning, and whether something is damping it.">String by string</button>
+          <button type="button" data-checkmode="strum" data-tip="Strum the whole chord. Gives purity, fullness and tuning, and which strings did not ring, rang on the wrong fret, or should be muted.">Whole strum</button>
+        </div>
+
+        <div class="lte-check-board" id="lteCheckBoard" aria-label="Strings of the chord"></div>
+
+        <div class="lte-check-prompt" id="lteCheckPrompt" aria-live="polite"></div>
+
+        <div class="lte-check-result" id="lteCheckResult" hidden>
+          <div class="lte-check-title" id="lteCheckTitle"></div>
+          <div class="lte-check-detail" id="lteCheckDetail"></div>
+          <div class="lte-check-tip" id="lteCheckTip"></div>
+        </div>
+
+        <div class="lte-check-strum" id="lteCheckStrum" hidden>
+          <div class="lte-metrics">
+            <div data-tip="How cleanly the notes belong to the chord (100% = no stray notes)."><span>Purity</span><b id="lteCheckPurity">—</b></div>
+            <div data-tip="How many of the chord's notes rang out together."><span>Fullness</span><b id="lteCheckFull">—</b></div>
+            <div data-tip="How close the chord's notes are to pitch, on average."><span>Tuning</span><b id="lteCheckTune">—</b></div>
+          </div>
+          <div class="lte-check-headline" id="lteCheckHeadline"></div>
+          <ul class="lte-check-issues" id="lteCheckIssues"></ul>
+        </div>
+
+        <button class="lte-go" id="lteCheckBtn" type="button" data-on="false">Start checking</button>
+        <p class="hint">The diagram follows the shape shown on each chord's tab above — change a shape there and the check follows it.</p>
+      </div>
+    </details>
+
     <div class="panel">
       <div class="row">
         <span class="lbl" data-tip="Choose whether you specify the target progression or let Blink guess every chord.">Chords</span>
