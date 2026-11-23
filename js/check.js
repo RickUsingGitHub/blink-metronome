@@ -60,6 +60,9 @@ function sharedWithLower(sources, s){
    One string
    ================================================================= */
 
+/* Defaults are the standard grading; strictness.js supplies gentler or
+   harsher ones (checkTuneOk, shortSustain, strumTuneOk). Strictness only
+   moves these tolerances — a wrong fret is a wrong fret at every level. */
 export const STRING_TUNING_OK  = 12;    // cents either way that count as in tune
 export const SHORT_SUSTAIN_SEC = 0.45;  // a free string rings far longer than this
 
@@ -71,7 +74,10 @@ export const SHORT_SUSTAIN_SEC = 0.45;  // a free string rings far longer than t
    Fret buzz is deliberately not judged: the pitch analysis filters out the
    rattle, and through a phone mic buzz cannot be told reliably from pick
    noise — a wrong "buzz" verdict would send you fixing the wrong thing. */
-export function diagnoseString(pluck, frets, idx, a4 = 440){
+export function diagnoseString(pluck, frets, idx, a4 = 440, grading){
+  const g = grading || {};
+  const tuneOk = g.checkTuneOk !== undefined ? g.checkTuneOk : STRING_TUNING_OK;
+  const shortSustain = g.shortSustain !== undefined ? g.shortSustain : SHORT_SUSTAIN_SEC;
   const strs = chordStrings(frets);
   const s = strs[idx];
   const who = stringLabel(idx);
@@ -112,13 +118,13 @@ export function diagnoseString(pluck, frets, idx, a4 = 440){
 
   /* The right note. */
   if(heard.midi === s.midi){
-    if(pluck.sustainSec < SHORT_SUSTAIN_SEC){
+    if(pluck.sustainSec < shortSustain){
       return out('dull', 'Right note, but it dies away fast',
-        cap(who) + ' plays ' + want + ', then fades in under half a second — something is damping it.',
+        cap(who) + ' plays ' + want + ', then fades away in ' + pluck.sustainSec.toFixed(1) + ' s — something is damping it.',
         'Usually the underside of a neighbouring finger is resting on it. Arch that finger more so it only touches its own string.');
     }
     const c = heard.cents;
-    if(Math.abs(c) > STRING_TUNING_OK){
+    if(Math.abs(c) > tuneOk){
       const sharp = c > 0;
       return out('tune', Math.abs(c) + ' ' + plural(Math.abs(c), 'cent', 'cents') + (sharp ? ' sharp' : ' flat'),
         cap(who) + ' plays the right note, ' + want + ', but ' + (sharp ? 'a little high.' : 'a little low.'),
@@ -297,7 +303,9 @@ export function averageFrames(frames){
 /* info: an averageFrames() result. Returns one entry per string:
    { idx, status, title, detail, tip } with status
    ok · tune · silent · unsure · open · fret · rings · quiet · range */
-export function diagnoseStrum(info, frets){
+export function diagnoseStrum(info, frets, grading){
+  const g = grading || {};
+  const strumTuneOk = g.strumTuneOk !== undefined ? g.strumTuneOk : STRUM_TUNING_OK;
   const strs = chordStrings(frets);
   const notes = info && info.notes;
   const strength = m => (notes && m >= NOTE_LO && m <= NOTE_HI) ? notes[m] : 0;
@@ -370,7 +378,7 @@ export function diagnoseStrum(info, frets){
         return entry('ok', 'Rings', who + ' rings as ' + want + ' (its tuning can\'t be read in a strum).');
       }
       const c = Math.round(info.noteCents[s.midi] || 0);
-      if(Math.abs(c) > STRUM_TUNING_OK){
+      if(Math.abs(c) > strumTuneOk){
         return entry('tune', 'Rings, but ' + (c > 0 ? 'sharp' : 'flat'),
           who + ' rings as ' + want + ', about ' + Math.abs(c) + ' cents ' + (c > 0 ? 'sharp' : 'flat') + '.',
           'Check this string with String by string or on the Tuner tab for an exact reading.');

@@ -691,8 +691,14 @@ export function extractChroma(input, sampleRate, opts){
   return { chroma, rms, clarity, bassPc, avgAbsCents, activePcs, notes, noteCents };
 }
 
-/* ---------- score any specific chord against an extracted chroma ---------- */
-export function rateChordAccuracy(chordObj, chromaInfo){
+/* ---------- score any specific chord against an extracted chroma ----------
+   grading (optional, from strictness.js): tuneGrace — cents of drift that
+   cost nothing — and tuneSlope — points lost per cent beyond it. Left out,
+   it grades as Blink always has (3 cents, 1.75 per cent). */
+export function rateChordAccuracy(chordObj, chromaInfo, grading){
+  const g = grading || {};
+  const tuneGrace = g.tuneGrace !== undefined ? g.tuneGrace : 3;
+  const tuneSlope = g.tuneSlope !== undefined ? g.tuneSlope : 1.75;
   const c = getChord(chordObj);
   if(!c || !chromaInfo || chromaInfo.clarity <= 0){
     return { accuracy: 0, purity: 0, completeness: 0, tuning: 0, score: -1 };
@@ -724,7 +730,7 @@ export function rateChordAccuracy(chordObj, chromaInfo){
   const completeness = Math.round(Math.max(0, Math.min(100, (0.55 * avgCore + 0.45 * minFactor) * 100)));
 
   /* 3. Tuning: cents deviation of active chord tones from A4 reference. */
-  const tuning = Math.round(Math.max(0, Math.min(100, 100 - Math.max(0, avgAbsCents - 3) * 1.75)));
+  const tuning = Math.round(Math.max(0, Math.min(100, 100 - Math.max(0, avgAbsCents - tuneGrace) * tuneSlope)));
 
   /* Template match score used to rank candidate chords. */
   let weightedIn = 0, weightSum = 0;
@@ -783,12 +789,16 @@ export function detectChord(input, sampleRate, opts){
   );
   const expectedChord = o.expected ? getChord(o.expected) : null;
   const customTabs = (o.customTabs && typeof o.customTabs === 'object') ? o.customTabs : null;
+  const grading = { tuneGrace: o.tuneGrace, tuneSlope: o.tuneSlope };
+  /* Benefit of the doubt towards the chord you meant to play: gentler
+     strictness lets a messy strum still count as it; the strictest gives none. */
+  const expectedBonus = o.expectedBonus !== undefined ? o.expectedBonus : 0.04;
 
   const evalCandidate = cand => {
-    const baseM = rateChordAccuracy(cand, info);
+    const baseM = rateChordAccuracy(cand, info, grading);
     if(customTabs && Array.isArray(customTabs[cand.id])){
       const customCand = buildCustomChord(cand.id, customTabs[cand.id]);
-      const customM = rateChordAccuracy(customCand, info);
+      const customM = rateChordAccuracy(customCand, info, grading);
       if(customM.score > baseM.score || (customM.score >= baseM.score - 0.04 && customM.accuracy > baseM.accuracy)){
         return { cand: customCand, m: customM };
       }
@@ -806,7 +816,7 @@ export function detectChord(input, sampleRate, opts){
     const { cand, m } = evalCandidate(rawCand);
     let s = m.score;
     if(targetSet.has(cand.id)) s += 0.06;
-    if(expectedChord && cand.id === expectedChord.id) s += 0.04;
+    if(expectedChord && cand.id === expectedChord.id) s += expectedBonus;
 
     if(s > bestScore){
       secondScore = bestScore;
@@ -847,9 +857,38 @@ export function detectChord(input, sampleRate, opts){
   let finalMetrics = bestMetrics;
   let matchedTarget = true;
 
+  /* Gentlest grading only (acceptPartial): a strum that is the chord you
+     meant with a note missing — same root, nothing that doesn't belong, e.g.
+     C5 when you were going for C — counts as that chord, scored down for the
+     missing note, instead of as a wrong chord. What was really heard is kept
+     in heardChord so the read-out can say a note is missing. */
+  let partial = false;
+  const heardChord = best.id;
+  const isPartialOf = (a, b) => a.root === b.root && a.pitchClasses.length < b.pitchClasses.length &&
+                                a.pitchClasses.every(pc => b.pitchClasses.includes(pc));
+  /* Judge "nothing that doesn't belong" on the sound itself, not on the
+     detector's guess: no note outside the chord meant may be ringing at the
+     level the analyser counts as active. (The purity score is too forgiving
+     for this — one stray note still leaves ~90%.) A stray wrong note is a
+     mistake to hear about, not a missing note. */
+  const acceptAs = target => {
+    const ev = evalCandidate(target);
+    const stray = Array.prototype.some.call(info.chroma || [], (v, pc) => v >= 0.22 && !ev.cand.pitchClasses.includes(pc));
+    if(stray) return false;
+    best = ev.cand;
+    // counted, but never graded as high as a chord with nothing missing
+    finalMetrics = o.partialMax !== undefined
+      ? { ...ev.m, accuracy: Math.min(ev.m.accuracy, o.partialMax) }
+      : ev.m;
+    matchedTarget = true;
+    partial = true;
+    return true;
+  };
+
   if(expectedChord){
     matchedTarget = best.id === expectedChord.id;
-    if(!matchedTarget){
+    const accepted = !matchedTarget && o.acceptPartial && isPartialOf(best, expectedChord) && acceptAs(expectedChord);
+    if(!accepted && !matchedTarget){
       const expMetrics = evalCandidate(expectedChord).m;
       finalMetrics = {
         ...expMetrics,
@@ -858,7 +897,10 @@ export function detectChord(input, sampleRate, opts){
     }
   }else if(targetSet.size > 0){
     matchedTarget = targetSet.has(best.id);
-    if(!matchedTarget){
+    const partialOf = !matchedTarget && o.acceptPartial
+      ? [...targetSet].map(getChord).find(tc => tc && isPartialOf(best, tc)) : null;
+    const accepted = !!partialOf && acceptAs(partialOf);
+    if(!accepted && !matchedTarget){
       let bestTargetMetrics = { accuracy: 0, purity: 0, completeness: 0, tuning: 0 };
       for(const tid of targetSet){
         const tm = evalCandidate(getChord(tid)).m;
@@ -884,6 +926,8 @@ export function detectChord(input, sampleRate, opts){
     completeness: finalMetrics.completeness,
     tuning: finalMetrics.tuning,
     heardAccuracy: bestMetrics.accuracy,
+    partial,
+    heardChord,
     matchedTarget,
     expected: expectedChord ? expectedChord.id : null,
     rms: info.rms,
@@ -892,11 +936,14 @@ export function detectChord(input, sampleRate, opts){
   };
 }
 
-export function accuracyVerdict(acc){
-  if(acc >= 90) return { label:'Sealed · bang on', short:'Sealed', tier:'ok' };
-  if(acc >= 78) return { label:'Clean lick',       short:'Clean',  tier:'ok' };
-  if(acc >= 62) return { label:'A bit unstuck',    short:'Fair',   tier:'near' };
-  return               { label:'Torn envelope',    short:'Sloppy', tier:'far' };
+/* cutoffs: [Sealed, Clean, Fair] scores, from strictness.js; left out, the
+   standard 90 / 78 / 62. */
+export function accuracyVerdict(acc, cutoffs){
+  const [sealed, clean, fair] = Array.isArray(cutoffs) && cutoffs.length === 3 ? cutoffs : [90, 78, 62];
+  if(acc >= sealed) return { label:'Sealed · bang on', short:'Sealed', tier:'ok' };
+  if(acc >= clean)  return { label:'Clean lick',       short:'Clean',  tier:'ok' };
+  if(acc >= fair)   return { label:'A bit unstuck',    short:'Fair',   tier:'near' };
+  return                   { label:'Torn envelope',    short:'Sloppy', tier:'far' };
 }
 
 /* ---------- envelope & strum counter ("Licking Them Envelopes") ----------
@@ -979,7 +1026,12 @@ export function createEnvelopeTracker(opts){
       chromaInfo: info,
       targets: so.targets,
       expected: so.expected,
-      customTabs: so.customTabs
+      customTabs: so.customTabs,
+      tuneGrace: so.tuneGrace,
+      tuneSlope: so.tuneSlope,
+      expectedBonus: so.expectedBonus,
+      acceptPartial: so.acceptPartial,
+      partialMax: so.partialMax
     });
 
     if(instant.chord && instant.chord === stableChord){
@@ -1069,7 +1121,12 @@ export function createEnvelopeTracker(opts){
         },
         targets: so.targets,
         expected: so.expected,
-        customTabs: so.customTabs
+        customTabs: so.customTabs,
+        tuneGrace: so.tuneGrace,
+        tuneSlope: so.tuneSlope,
+        expectedBonus: so.expectedBonus,
+        acceptPartial: so.acceptPartial,
+        partialMax: so.partialMax
       });
 
       if(settled.chord){

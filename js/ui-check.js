@@ -14,6 +14,7 @@ import {
   diagnoseStrum, summariseStrum, createStrumListener
 } from './check.js';
 import { gateFromSens, activeFretsFor } from './ui-lte.js';
+import { strictProfile } from './strictness.js';
 import { $, toast, segment, segmentSet } from './ui.js';
 
 const FFT = 4096;
@@ -24,6 +25,8 @@ let chord = null;               // chord being checked
 let selIdx = 0;                 // string being checked, 0 = low E … 5 = high E
 let stringResults = [];         // per string, from plucking it alone
 let strumResults = [];          // per string, from the last strum
+let stringRaw = [];             // what was heard, kept so a new strictness can re-grade it
+let strumRaw = null;
 let pluckL = null, strumL = null;
 let signature = '';
 
@@ -37,6 +40,7 @@ const TONE = {
 };
 const MARK = { ok: '✓', warn: '!', bad: '✕', unsure: '?' };
 const tone = status => TONE[status] || 'unsure';
+const prof = () => strictProfile(state.lteStrict);
 
 function fretsFor(ch){ return activeFretsFor(ch); }
 function chordsToCheck(){ return state.lteChords.length ? state.lteChords : []; }
@@ -145,7 +149,7 @@ function showStrum(info, strings){
   const panel = $('lteCheckStrum');
   panel.hidden = false;
 
-  const m = rateChordAccuracy(buildCustomChord(chord, fretsFor(chord)), info);
+  const m = rateChordAccuracy(buildCustomChord(chord, fretsFor(chord)), info, prof());
   $('lteCheckPurity').textContent = m.purity + '%';
   $('lteCheckFull').textContent = m.completeness + '%';
   $('lteCheckTune').textContent = m.tuning + '%';
@@ -187,7 +191,28 @@ function paintButton(){
   b.disabled = !chord;
 }
 
+function paintLevel(){
+  const el = $('lteCheckLevel');
+  el.innerHTML = 'Graded as <b></b> — change Strictness in the settings below.';
+  el.querySelector('b').textContent = prof().short;
+}
+
+/* Strictness moved: judge what was already heard again, at the new level. */
+function regrade(){
+  if(!chord) return;
+  const frets = fretsFor(chord);
+  stringResults = stringRaw.map((r, idx) => r ? diagnoseString(r, frets, idx, state.a4, prof()) : undefined);
+  if(strumRaw){
+    const strings = diagnoseStrum(strumRaw, frets, prof());
+    strumResults = [];
+    strings.forEach(s => { strumResults[s.idx] = s; });
+    showStrum(strumRaw, strings);
+  }
+  paintAll();
+}
+
 function paintAll(){
+  paintLevel();
   segmentSet($('lteCheckModeSeg'), 'checkmode', state.lteCheckMode);
   paintChords();
   paintBoard();
@@ -215,7 +240,8 @@ function makeListeners(){
 }
 
 function onPluck(r){
-  const d = diagnoseString(r, fretsFor(chord), selIdx, state.a4);
+  stringRaw[selIdx] = r;
+  const d = diagnoseString(r, fretsFor(chord), selIdx, state.a4, prof());
   stringResults[selIdx] = d;
   showStringResult(d);
   const good = tone(d.status) === 'ok';
@@ -228,7 +254,8 @@ function onPluck(r){
 }
 
 function onStrum(info){
-  const strings = diagnoseStrum(info, fretsFor(chord));
+  strumRaw = info;
+  const strings = diagnoseStrum(info, fretsFor(chord), prof());
   strumResults = [];
   strings.forEach(s => { strumResults[s.idx] = s; });
   showStrum(info, strings);
@@ -312,6 +339,8 @@ function nextUnchecked(from){
 function resetResults(){
   stringResults = [];
   strumResults = [];
+  stringRaw = [];
+  strumRaw = null;
   $('lteCheckResult').hidden = true;
   $('lteCheckStrum').hidden = true;
   paintSummary('');
@@ -350,6 +379,7 @@ export function initCheck(){
 
   bus.on('mic:claim', who => { if(who !== 'check') stopCheck(); });
   bus.on('lte:chords', onChordsChanged);
+  bus.on('lte:strict', regrade);
 
   chord = chordsToCheck()[0] || null;
   onChordsChanged();

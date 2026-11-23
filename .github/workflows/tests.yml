@@ -22,3 +22,4 @@ jobs:
       - run: node tests/chord.test.js
       - run: node tests/lte-sets.test.js
       - run: node tests/check.test.js
+      - run: node tests/strictness.test.js

@@ -74,6 +74,14 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 - Countdown timer (30s, 1m default, 2m, 3m, 5m, custom ±15s, or open-ended ∞)
 - Two modes: tell it which chords you're playing (presets or custom list, in order or any order) or let Blink auto-detect across 120 chord shapes
 - Custom chord sets are kept: once you Set them they appear under **My chord sets** in the Drill list for the next practice, and **Remove** beside the list takes one out when you are done with it
+- **Strictness** — how harshly chords are graded, on five steps from *I'm a beginner, be gentle with
+  me* to *I'm a guitar God*. Gentler levels forgive more tuning drift, give lower verdict cut-offs, and
+  (Beginner only) count a chord with a note missing as the chord you meant, scored down and labelled
+  "heard C5 — a note is missing". Stricter levels tighten all of that until only pitch-perfect,
+  full chords score well. It also sets the chord check's tolerances. It never changes facts: a wrong
+  chord, a wrong fret or a muted string ringing is reported at every level. The middle step, *Solid
+  player*, is the grading Blink has always used. Each session is graded at the level it was played
+  at, and the level is locked while a session runs.
 - **Check a chord** before practising, so you can fix the shape before you count:
   - *String by string* — tap a string on the diagram and pluck it. Exact pitch tells you the fret you
     actually played ("That is fret 4 — move that finger 2 frets towards the headstock"), when a
@@ -132,6 +140,7 @@ node tests/pitch.test.js
 node tests/chord.test.js
 node tests/lte-sets.test.js
 node tests/check.test.js
+node tests/strictness.test.js
 ```
 
 The chord-check tests synthesise plucked strings and strums as sound over time — right notes, wrong

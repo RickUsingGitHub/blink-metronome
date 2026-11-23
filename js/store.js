@@ -1,6 +1,6 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.7.0';
+export const VERSION = '1.8.0';
 export const KOFI_URL = 'https://ko-fi.com/rickapps';
 const KEY = 'blink.v1';
 
@@ -146,6 +146,7 @@ function defaults(){
     lteHistory:[],
     lteSaved:[],              // chord sets you typed in, kept for next practice
     lteCheckMode:'string', lteCheckOpen:true,   // the chord check panel
+    lteStrict:3,              // grading strictness, 1 gentle … 5 pitch perfect (strictness.js)
     lists:[{ id:'L1', name:'My setlist', auto:false, bars:8, songs:[] }],
     listIdx:0, songIdx:null,
     stats:{ day:today(), today:0, total:0 }
@@ -250,6 +251,7 @@ export function load(){
   state.lteShowDetails = !!o.lteShowDetails;
   state.lteCheckMode   = o.lteCheckMode === 'strum' ? 'strum' : 'string';
   state.lteCheckOpen   = o.lteCheckOpen !== false;
+  state.lteStrict      = int(o.lteStrict, 1, 5, 3);
   state.lteTabShapes   = {};
   if(o.lteTabShapes && typeof o.lteTabShapes === 'object'){
     for(const [k, v] of Object.entries(o.lteTabShapes)){
@@ -266,6 +268,7 @@ export function load(){
                            count: int(h.count, 0, 9999, 0),
                            avgAcc: int(h.avgAcc, 0, 100, 0),
                            cleanCount: int(h.cleanCount, 0, 9999, 0),
+                           strict: int(h.strict, 1, 5, 3),
                            chords: Array.isArray(h.chords) ? h.chords.filter(x => typeof x === 'string').slice(0, 12) : []
                          }))
                        : [];

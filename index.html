@@ -437,6 +437,7 @@
           <ul class="lte-check-issues" id="lteCheckIssues"></ul>
         </div>
 
+        <p class="lte-check-level" id="lteCheckLevel"></p>
         <button class="lte-go" id="lteCheckBtn" type="button" data-on="false">Start checking</button>
         <p class="hint">The diagram follows the shape shown on each chord's tab above — change a shape there and the check follows it.</p>
       </div>
@@ -481,6 +482,18 @@
         <div class="sigbox">
           <button class="step sm" id="lteDurMinus" type="button" aria-label="15 seconds less">−</button>
           <button class="step sm" id="lteDurPlus" type="button" aria-label="15 seconds more">+</button>
+        </div>
+      </div>
+
+      <div class="lte-strict">
+        <div class="row">
+          <span class="lbl" data-tip="How harshly your chords are graded, from gentle to pitch perfect. Not the same as Sensitivity below, which is how loud a strum must be to be heard.">Strictness</span>
+          <input type="range" id="lteStrictRange" min="1" max="5" step="1" value="3" aria-label="Grading strictness" aria-describedby="lteStrictDesc">
+        </div>
+        <div class="lte-strict-ends" aria-hidden="true"><span>Be gentle</span><span>Pitch perfect</span></div>
+        <div class="lte-strict-read" aria-live="polite">
+          <b id="lteStrictName">Solid player</b>
+          <span id="lteStrictDesc">The standard grading — clean chords, reasonably in tune.</span>
         </div>
       </div>
 

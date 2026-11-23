@@ -11,6 +11,7 @@ import {
   getChordTabs, accuracyVerdict, createEnvelopeTracker
 } from './chord.js';
 import { NOTE_NAMES } from './pitch.js';
+import { STRICTNESS, strictProfile } from './strictness.js';
 import { acquire, release, micError } from './mic.js';
 import { playChime, playChordPreview } from './audio.js';
 import { $, $$, toast, segment, segmentSet } from './ui.js';
@@ -33,6 +34,10 @@ let targetIdx = 0;
 let sessionLog = [];
 let tracker = null;
 let flashTimer = null;
+
+/* The grading level in force now; a logged chord keeps the level it was played at. */
+const prof = () => strictProfile(state.lteStrict);
+const cutoffsOf = item => strictProfile(item && item.strict).verdict;
 
 export function gateFromSens(sens){
   return 0.018 * Math.pow(0.76, clamp(sens, 1, 10) - 1);
@@ -334,6 +339,20 @@ function paintTimer(){
   $('lteTimeFill').style.width = pct.toFixed(1) + '%';
 }
 
+/* Strictness is fixed for the length of a session, so every chord in it is
+   graded the same way. */
+function paintStrict(){
+  const lv = prof();
+  const range = $('lteStrictRange');
+  range.value = lv.level;
+  range.disabled = sessionActive;
+  range.setAttribute('aria-valuetext', lv.name);
+  range.title = sessionActive ? 'Locked while a session is running' : '';
+  $('lteStrictName').textContent = lv.name;
+  $('lteStrictDesc').textContent = lv.desc;
+  range.closest('.lte-strict').classList.toggle('locked', sessionActive);
+}
+
 function paintControls(){
   $('lteMicBtn').textContent = micOn ? 'Stop mic' : 'Listen';
   $('lteMicBtn').dataset.on = String(micOn);
@@ -353,6 +372,7 @@ function paintControls(){
   $('lteChangesChk').checked = state.lteChangesOnly;
   $('lteSensRange').value = state.lteSens;
   $('lteSensVal').textContent = state.lteSens;
+  paintStrict();
   $('lteChordInput').value = state.lteChords.join(', ');
 
   const gatePct = clamp(((gateFromSens(state.lteSens) * 1.8) / 0.06) * 100, 3, 92);
@@ -390,7 +410,7 @@ function clearReadout(){
 
 function showDetection(res, isCounted){
   const card = $('lteCard');
-  const verdict = accuracyVerdict(res.accuracy);
+  const verdict = accuracyVerdict(res.accuracy, prof().verdict);
   $('lteTabDeck').hidden = true;
   $('lteLiveRow').hidden = false;
   $('lteChord').textContent = res.chord || '—';
@@ -419,6 +439,9 @@ function showDetection(res, isCounted){
   }else if(wrongTarget){
     $('lteChordSub').textContent =
       'Expected ' + res.expected + ' — heard ' + res.label + ' (' + res.accuracy + '% match)';
+  }else if(res.partial){
+    // gentlest grading: counted as the chord you meant, but say what was missing
+    $('lteChordSub').textContent = res.label + ' · heard ' + res.heardChord + ' — a note is missing · ' + verdict.label;
   }else{
     $('lteChordSub').textContent = res.label + ' · ' + verdict.label;
   }
@@ -461,7 +484,7 @@ function renderLog(){
   /* Show newest first so the player sees each strum immediately. */
   for(let i = sessionLog.length - 1; i >= 0; i--){
     const item = sessionLog[i];
-    const v = accuracyVerdict(item.accuracy);
+    const v = accuracyVerdict(item.accuracy, cutoffsOf(item));
     const tier = (item.expected && !item.matched) ? 'far' : v.tier;
 
     const li = document.createElement('li');
@@ -478,7 +501,9 @@ function renderLog(){
     title.className = 'lte-row-name';
     title.textContent = item.expected && !item.matched
       ? item.chord + ' (wanted ' + item.expected + ')'
-      : item.chord;
+      : item.partial
+        ? item.chord + ' (heard ' + item.heardChord + ', a note missing)'
+        : item.chord;
     const meta = document.createElement('div');
     meta.className = 'lte-row-meta';
     meta.textContent = fmtTime(item.elapsed) + ' · purity ' + item.purity +
@@ -505,7 +530,7 @@ function renderBest(){
   for(const h of state.lteHistory){
     if(h.count > best.count || (h.count === best.count && h.avgAcc > best.avgAcc)) best = h;
   }
-  el.textContent = 'Best: ' + best.count + ' @ ' + best.avgAcc + '%';
+  el.textContent = 'Best: ' + best.count + ' @ ' + best.avgAcc + '% · ' + strictProfile(best.strict).short;
 }
 
 function showSummary(elapsedSec){
@@ -522,10 +547,11 @@ function showSummary(elapsedSec){
   const avgPurity = Math.round(sessionLog.reduce((a, x) => a + x.purity, 0) / count);
   const avgFull = Math.round(sessionLog.reduce((a, x) => a + x.completeness, 0) / count);
   const avgTune = Math.round(sessionLog.reduce((a, x) => a + x.tuning, 0) / count);
-  const cleanCount = sessionLog.filter(x => x.accuracy >= 78 && (x.matched !== false)).length;
+  const cleanCount = sessionLog.filter(x => x.accuracy >= cutoffsOf(x)[1] && (x.matched !== false)).length;
   const mins = Math.max(1 / 60, elapsedSec / 60);
   const cpm = (count / mins).toFixed(1);
-  const v = accuracyVerdict(avgAcc);
+  const level = strictProfile(sessionLog[0].strict);
+  const v = accuracyVerdict(avgAcc, level.verdict);
 
   paceEl.textContent = cpm + ' chords/min';
   box.innerHTML =
@@ -535,7 +561,8 @@ function showSummary(elapsedSec){
       '<div><span>Clean hits</span><b>' + cleanCount + '/' + count + '</b></div>' +
       '<div><span>Verdict</span><b data-tier="' + v.tier + '">' + v.short + '</b></div>' +
     '</div>' +
-    '<div class="lte-sum-sub">Avg purity ' + avgPurity + '% · fullness ' + avgFull + '% · tuning ' + avgTune + '%</div>';
+    '<div class="lte-sum-sub">Avg purity ' + avgPurity + '% · fullness ' + avgFull + '% · tuning ' + avgTune + '%</div>' +
+    '<div class="lte-sum-sub">Graded as ' + level.short + '</div>';
 
   panel.hidden = false;
 }
@@ -554,7 +581,12 @@ function sample(){
       targets,
       expected,
       changesOnly: state.lteChangesOnly,
-      customTabs: state.lteTabShapes
+      customTabs: state.lteTabShapes,
+      tuneGrace: prof().tuneGrace,
+      tuneSlope: prof().tuneSlope,
+      expectedBonus: prof().expectedBonus,
+      acceptPartial: !!prof().acceptPartial,
+      partialMax: prof().partialMax
     });
 
     liveEnv = stepOut.envelope;
@@ -570,7 +602,10 @@ function sample(){
         purity: ev.purity,
         completeness: ev.completeness,
         tuning: ev.tuning,
-        elapsed: elapsedSec
+        elapsed: elapsedSec,
+        strict: state.lteStrict,
+        partial: !!ev.partial,
+        heardChord: ev.heardChord
       });
       lastReadAt = now;
       lastCountDisplayAt = now;
@@ -699,7 +734,7 @@ function finishSession(completed){
 
   if(sessionLog.length > 0){
     const avgAcc = Math.round(sessionLog.reduce((a, x) => a + x.accuracy, 0) / sessionLog.length);
-    const cleanCount = sessionLog.filter(x => x.accuracy >= 78 && x.matched !== false).length;
+    const cleanCount = sessionLog.filter(x => x.accuracy >= cutoffsOf(x)[1] && x.matched !== false).length;
     state.lteHistory.unshift({
       at: new Date().toISOString().slice(0, 16),
       mode: state.lteMode,
@@ -707,6 +742,7 @@ function finishSession(completed){
       count: sessionLog.length,
       avgAcc,
       cleanCount,
+      strict: state.lteStrict,
       chords: state.lteMode === 'target' ? state.lteChords.slice() : []
     });
     if(state.lteHistory.length > 20) state.lteHistory.length = 20;
@@ -875,6 +911,14 @@ export function initLte(){
   };
   $('lteDurMinus').addEventListener('click', () => stepDur(-15));
   $('lteDurPlus').addEventListener('click',  () => stepDur(15));
+
+  $('lteStrictRange').addEventListener('input', e => {
+    if(sessionActive) return;
+    state.lteStrict = clamp(Math.round(+e.target.value), STRICTNESS[0].level, STRICTNESS[STRICTNESS.length - 1].level);
+    paintStrict();
+    save();
+    bus.emit('lte:strict');            // the chord check re-grades what it heard
+  });
 
   $('lteSensRange').addEventListener('input', e => {
     state.lteSens = +e.target.value;

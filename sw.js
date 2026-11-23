@@ -1,6 +1,6 @@
 /* Offline shell. Bump CACHE when any file below changes. */
 
-const CACHE = 'blink-v1.7.0';
+const CACHE = 'blink-v1.8.0';
 const FILES = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const FILES = [
   './js/pitch.js',
   './js/chord.js',
   './js/check.js',
+  './js/strictness.js',
   './js/ui.js',
   './js/ui-metronome.js',
   './js/ui-setlist.js',
