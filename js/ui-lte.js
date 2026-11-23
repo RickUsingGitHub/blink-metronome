@@ -2,7 +2,10 @@
    Uses polyphonic chroma + attack-envelope tracking from chord.js over the
    shared reference-counted microphone in mic.js. */
 
-import { state, save, clamp, fmtTime } from './store.js';
+import {
+  state, save, clamp, fmtTime,
+  sameChords, chordSetLabel, rememberChordSet, forgetChordSet
+} from './store.js';
 import {
   CHORD_PRESETS, STANDARD_STRINGS, parseChordList, chordVoicing,
   getChordTabs, accuracyVerdict, createEnvelopeTracker
@@ -224,22 +227,52 @@ function paintChromaStrip(chroma, chordNotes, allowStray){
   });
 }
 
-/* ---------- target pills & presets ---------- */
+/* ---------- target pills & presets ----------
+   The Drill list holds your own chord sets first — every set of custom chords
+   you Set is kept there for the next practice — then the built-in drills,
+   then "Custom chords…" for typing a new one. */
+function makeOption(value, label){
+  const o = document.createElement('option');
+  o.value = value;
+  o.textContent = label;
+  return o;
+}
+
+function findSet(id){
+  return state.lteSaved.find(s => s.id === id) || CHORD_PRESETS.find(p => p.id === id) || null;
+}
+
 function buildPresets(){
   const sel = $('ltePreset');
   if(!sel) return;
   sel.textContent = '';
-  CHORD_PRESETS.forEach(p => {
-    const o = document.createElement('option');
-    o.value = p.id;
-    o.textContent = p.name;
-    sel.appendChild(o);
-  });
-  const custom = document.createElement('option');
-  custom.value = 'custom';
-  custom.textContent = 'Custom chords…';
-  sel.appendChild(custom);
-  sel.value = CHORD_PRESETS.some(p => p.id === state.ltePreset) ? state.ltePreset : 'custom';
+  if(state.lteSaved.length){
+    const mine = document.createElement('optgroup');
+    mine.label = 'My chord sets';
+    state.lteSaved.forEach(s => mine.appendChild(makeOption(s.id, chordSetLabel(s.chords))));
+    sel.appendChild(mine);
+  }
+  const drills = document.createElement('optgroup');
+  drills.label = 'Drills';
+  CHORD_PRESETS.forEach(p => drills.appendChild(makeOption(p.id, p.name)));
+  sel.appendChild(drills);
+  sel.appendChild(makeOption('custom', 'Custom chords…'));
+  sel.value = findSet(state.ltePreset) ? state.ltePreset : 'custom';
+  paintRemove();
+}
+
+/* Remove only appears while one of your own sets is selected — the built-in
+   drills cannot be removed. */
+function paintRemove(){
+  const b = $('ltePresetRemove');
+  if(!b) return;
+  const s = state.lteSaved.find(x => x.id === state.ltePreset);
+  b.hidden = !s;
+  if(s){
+    const label = chordSetLabel(s.chords);
+    b.dataset.tip = 'Remove ' + label + ' from your chord sets. The chords stay loaded for this practice.';
+    b.setAttribute('aria-label', 'Remove chord set ' + label);
+  }
 }
 
 function renderTargets(){
@@ -275,11 +308,12 @@ function renderTargets(){
 }
 
 function syncPresetFromChords(){
-  const joined = state.lteChords.join(',');
-  const hit = CHORD_PRESETS.find(p => p.chords.join(',') === joined);
+  const hit = CHORD_PRESETS.find(p => sameChords(p.chords, state.lteChords))
+           || state.lteSaved.find(s => sameChords(s.chords, state.lteChords));
   state.ltePreset = hit ? hit.id : 'custom';
   const sel = $('ltePreset');
   if(sel) sel.value = state.ltePreset;
+  paintRemove();
 }
 
 /* ---------- timer & buttons ---------- */
@@ -733,32 +767,74 @@ export function initLte(){
   });
 
   $('ltePreset').addEventListener('change', e => {
-    const p = CHORD_PRESETS.find(x => x.id === e.target.value);
-    if(!p) return;
-    state.ltePreset = p.id;
-    state.lteChords = p.chords.slice();
+    const id = e.target.value;
+    if(id === 'custom'){
+      // "Custom chords…" means: type a new set below
+      state.ltePreset = 'custom';
+      paintRemove();
+      const inp = $('lteChordInput');
+      inp.focus();
+      inp.select();
+      save();
+      return;
+    }
+    const set = findSet(id);
+    if(!set) return;
+    state.ltePreset = id;
+    state.lteChords = set.chords.slice();
     targetIdx = 0;
+    paintRemove();
     paintControls();
     renderTargets();
     clearReadout();
     save();
   });
 
+  /* Setting custom chords keeps them in the Drill list for next time. A set
+     that is already a built-in drill is just selected; one you have saved
+     before moves back to the top rather than appearing twice. */
   const applyCustomChords = () => {
     const parsed = parseChordList($('lteChordInput').value);
     if(!parsed.length){
       toast('Enter chord names like A, D or C G Am F');
       return;
     }
-    state.lteChords = parsed.slice(0, 12);
+    const chords = parsed.slice(0, 12);
+    state.lteChords = chords;
     targetIdx = 0;
-    syncPresetFromChords();
+
+    const drill = CHORD_PRESETS.find(p => sameChords(p.chords, chords));
+    let note;
+    if(drill){
+      state.ltePreset = drill.id;
+      note = 'already a built-in drill';
+    }else{
+      const r = rememberChordSet(state.lteSaved, chords);
+      state.lteSaved = r.list;
+      state.ltePreset = r.set.id;
+      note = r.added ? 'saved to your chord sets' : 'already in your chord sets';
+    }
+
+    buildPresets();
     paintControls();
     renderTargets();
     clearReadout();
     save();
-    toast('Target chords: ' + state.lteChords.join(' → '));
+    toast(chordSetLabel(chords) + ' — ' + note);
   };
+
+  $('ltePresetRemove').addEventListener('click', () => {
+    const s = state.lteSaved.find(x => x.id === state.ltePreset);
+    if(!s) return;
+    const label = chordSetLabel(s.chords);
+    if(!confirm('Remove ' + label + ' from your chord sets?')) return;
+    state.lteSaved = forgetChordSet(state.lteSaved, s.id);
+    // the chords stay loaded for this practice; only the saved entry goes
+    state.ltePreset = 'custom';
+    buildPresets();
+    save();
+    toast('Removed ' + label);
+  });
   $('lteChordApply').addEventListener('click', applyCustomChords);
   $('lteChordInput').addEventListener('keydown', ev => {
     if(ev.key === 'Enter'){ ev.preventDefault(); applyCustomChords(); }

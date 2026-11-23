@@ -1,6 +1,6 @@
 /* Shared state, persistence and a tiny event bus. */
 
-export const VERSION = '1.5.6';
+export const VERSION = '1.6.0';
 export const KOFI_URL = 'https://ko-fi.com/rickapps';
 const KEY = 'blink.v1';
 
@@ -144,6 +144,7 @@ function defaults(){
     lteChords:['A','D'], lteFollowOrder:true, lteChangesOnly:false, lteSens:5,
     lteShowDetails:false, lteTabShapes:{},
     lteHistory:[],
+    lteSaved:[],              // chord sets you typed in, kept for next practice
     lists:[{ id:'L1', name:'My setlist', auto:false, bars:8, songs:[] }],
     listIdx:0, songIdx:null,
     stats:{ day:today(), today:0, total:0 }
@@ -265,6 +266,23 @@ export function load(){
                            chords: Array.isArray(h.chords) ? h.chords.filter(x => typeof x === 'string').slice(0, 12) : []
                          }))
                        : [];
+  state.lteSaved       = Array.isArray(o.lteSaved)
+                       ? o.lteSaved
+                           .filter(s => s && typeof s === 'object' && Array.isArray(s.chords))
+                           .map(s => ({
+                             id: typeof s.id === 'string' && s.id ? s.id.slice(0, 16) : newId('my'),
+                             chords: s.chords.filter(x => typeof x === 'string' && x)
+                                             .map(x => x.slice(0, 12)).slice(0, 12)
+                           }))
+                           .filter(s => s.chords.length)
+                           .slice(0, MAX_SAVED_SETS)
+                       : [];
+  // Before sets were kept, custom chords were simply replaced by the next ones.
+  // The first time this version loads, keep whatever custom set was in use so
+  // it is already in the list. Runs once: after that lteSaved is always stored.
+  if(!Array.isArray(o.lteSaved) && state.ltePreset === 'custom' && state.lteChords.length){
+    state.lteSaved = [{ id: newId('my'), chords: state.lteChords.slice() }];
+  }
 
   if(Array.isArray(o.lists) && o.lists.length){
     state.lists = o.lists.map((l, i) => ({
@@ -321,6 +339,35 @@ export function resetAll(){
 }
 
 export function newId(prefix){ return prefix + Math.random().toString(36).slice(2,9); }
+
+/* ---------- saved LTE chord sets ----------
+   Pure list functions, so they can be tested under node. A set is an ordered
+   list of chord ids: order matters, because "follow order" drills them in
+   sequence, so C G Am F and Am F C G are two different sets. */
+export const MAX_SAVED_SETS = 30;
+
+export function sameChords(a, b){
+  return a.length === b.length && a.every((c, i) => c === b[i]);
+}
+
+/* Matches the built-in drills' naming: a pair swaps, a longer set runs on. */
+export function chordSetLabel(chords){
+  return chords.length === 2 ? chords[0] + ' ↔ ' + chords[1] : chords.join(' → ');
+}
+
+/* Put a set at the top of the list — adding it if it is new, moving it up if
+   it is already there — and keep the list to MAX_SAVED_SETS, dropping the
+   least recently used. */
+export function rememberChordSet(list, chords, makeId){
+  const found = list.find(s => sameChords(s.chords, chords));
+  const set = found || { id: (makeId || (() => newId('my')))(), chords: chords.slice() };
+  const next = [set].concat(list.filter(s => s !== set)).slice(0, MAX_SAVED_SETS);
+  return { list: next, set, added: !found };
+}
+
+export function forgetChordSet(list, id){
+  return list.filter(s => s.id !== id);
+}
 
 export function fmtTime(sec){
   sec = Math.max(0, Math.floor(sec));

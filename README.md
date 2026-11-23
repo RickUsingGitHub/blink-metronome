@@ -73,6 +73,7 @@ on iPhone, or the ⋮ menu → *Install app* on Android.
 **Licking Them Envelopes (LTE — Chord counter)**
 - Countdown timer (30s, 1m default, 2m, 3m, 5m, custom ±15s, or open-ended ∞)
 - Two modes: tell it which chords you're playing (presets or custom list, in order or any order) or let Blink auto-detect across 120 chord shapes
+- Custom chord sets are kept: once you Set them they appear under **My chord sets** in the Drill list for the next practice, and **Remove** beside the list takes one out when you are done with it
 - Tracks each strum attack envelope and rates accuracy across purity, fullness, and tuning
 - Live 12-note chroma strip, envelope threshold meter, session summary, and chord-by-chord log
 

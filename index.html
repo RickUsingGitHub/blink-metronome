@@ -414,11 +414,12 @@
 
       <div id="lteTargetPanel" class="lte-target-panel">
         <div class="row">
-          <span class="lbl" data-tip="Pick a common chord progression or switch to Custom chords.">Drill</span>
+          <span class="lbl" data-tip="Pick one of your own chord sets or a built-in drill, or choose Custom chords to type a new set.">Drill</span>
           <select id="ltePreset" class="select" aria-label="Chord drill preset"></select>
+          <button class="mini danger" id="ltePresetRemove" type="button" hidden>Remove</button>
         </div>
         <div class="row">
-          <span class="lbl" data-tip="Enter chord names separated by commas or spaces (e.g. G7, C, Am, D7).">Custom</span>
+          <span class="lbl" data-tip="Enter chord names separated by commas or spaces (e.g. G7, C, Am, D7). Set keeps them in the Drill list for next practice.">Custom</span>
           <input class="text" id="lteChordInput" type="text" placeholder="e.g. A, D or C G Am F" aria-label="Chords to play">
           <button class="mini" id="lteChordApply" type="button">Set</button>
         </div>
