@@ -265,11 +265,13 @@ export function averageFrames(frames){
   const n = NOTE_HI + 1;
   const notes = new Float32Array(n), cents = new Float32Array(n), centsW = new Float32Array(n);
   const chroma = new Float32Array(12);
+  const perNote = [];   // each frame's strengths, kept so a string can be judged at its best moment
   let wSum = 0, clarity = 0, rms = 0, bassVotes = new Float32Array(12);
   for(const f of frames){
     if(!f || !(f.clarity > 0) || !f.notes) continue;
     const w = Math.max(1e-9, f.rms * f.rms);
     wSum += w;
+    perNote.push(f.notes);
     for(let m = NOTE_LO; m <= NOTE_HI; m++){
       notes[m] += f.notes[m] * w;
       if(f.notes[m] > 0){ cents[m] += f.noteCents[m] * f.notes[m] * w; centsW[m] += f.notes[m] * w; }
@@ -297,7 +299,16 @@ export function averageFrames(frames){
   for(let m = NOTE_LO; m <= NOTE_HI; m++){
     if(notes[m] >= 0.22){ tc += Math.abs(cents[m]) * notes[m]; tw += notes[m]; }
   }
-  return { notes, noteCents: cents, chroma, clarity, rms, bassPc, activePcs, avgAbsCents: tw > 0 ? tc / tw : 0 };
+  /* A strum reaches the strings one after another and each then decays, so no
+     single averaged frame shows every string at full strength. best[m] is the
+     mean of a note's 3 strongest frames (each relative to that frame's loudest
+     note) - the same 'was it heard while it rang' idea the session above uses. */
+  const best = new Float32Array(n);
+  for(let m = NOTE_LO; m <= NOTE_HI; m++){
+    const vals = perNote.map(a => a[m] || 0).sort((x, y) => y - x).slice(0, 3);
+    best[m] = vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : 0;
+  }
+  return { notes, best, noteCents: cents, chroma, clarity, rms, bassPc, activePcs, avgAbsCents: tw > 0 ? tc / tw : 0 };
 }
 
 /* info: an averageFrames() result. Returns one entry per string:
@@ -308,7 +319,13 @@ export function diagnoseStrum(info, frets, grading){
   const strumTuneOk = g.strumTuneOk !== undefined ? g.strumTuneOk : STRUM_TUNING_OK;
   const strs = chordStrings(frets);
   const notes = info && info.notes;
-  const strength = m => (notes && m >= NOTE_LO && m <= NOTE_HI) ? notes[m] : 0;
+  const bests = info && info.best;
+  const strength = m => {
+    if(!(notes && m >= NOTE_LO && m <= NOTE_HI)) return 0;
+    return bests ? Math.max(notes[m], bests[m] * 0.85) : notes[m];
+  };
+  /* Pitch-class strength, as the session at the top reads it. */
+  const chromaOf = m => (info && info.chroma) ? (info.chroma[((m % 12) + 12) % 12] || 0) : 0;
   const inRange = m => m >= NOTE_LO && m <= NOTE_HI;
   const expectedMidis = new Set(strs.filter(s => !s.muted).map(s => s.midi));
 
@@ -402,6 +419,13 @@ export function diagnoseStrum(info, frets, grading){
             ' towards the ' + (up ? 'headstock.' : 'body of the guitar.'));
     }
 
+    /* Faint per note, but clearly there as a pitch class no other string in the
+       shape accounts for: the session above would count it. */
+    const pcShared = strs.some(o => o.idx !== s.idx && !o.muted && ((o.midi - s.midi) % 12 + 12) % 12 === 0);
+    if(!pcShared && v > SILENT && v < ring && chromaOf(s.midi) >= 0.4){
+      return entry('ok', 'Rings', who + ' rings as ' + want + '.');
+    }
+
     if(!shared && v <= SILENT){
       return entry('silent', 'Not ringing',
         who + ' should give ' + want + ' but did not sound.',
@@ -438,7 +462,7 @@ export function summariseStrum(strings){
    Returns null until a strum has been gathered, then an averageFrames() result. */
 export function createStrumListener(opts){
   const gate = (opts && opts.gate) || 0.006;
-  const keep = (opts && opts.frames) || 6;
+  const keep = (opts && opts.frames) || 8;
   let armed = true, quiet = 0, prev = 0, collecting = false, skip = 0, t0 = 0, frames = [];
 
   function step(f){
